@@ -24,5 +24,4 @@
 ### 🔗 Connect with Me
 <!-- ใส่ลิงก์โซเชียล/เว็บไซต์ของคุณ -->
 - LinkedIn: https://www.linkedin.com/in/saksit-khotwandee-35b68a41b
-- Website: _ใส่ลิงก์_
 - Email: teniji@gmail.com
