@@ -8,7 +8,7 @@
 ### 🙋‍♂️ About Me
 - 🔭 ตอนนี้กำลังทำ: การเงิน พัฒนาแอป
 - 🌱 กำลังเรียนรู้: web app mobile app
-- 💬 ถามผมได้เรื่อง:สร้าง mobile app
+- 💬 ถามผมได้เรื่อง: สร้าง mobile app
 - 📫 ติดต่อได้ที่: teniji@gmail.com
 
 ### 🛠️ Skills & Tools
