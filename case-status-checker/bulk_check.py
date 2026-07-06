@@ -193,6 +193,12 @@ def process_one(page, record, captcha_path, dialog_state):
             continue  # goto ใหม่รอบหน้าจะได้ captcha ใหม่อยู่แล้ว
 
         page.fill("input[name='imgCode']", code)
+        actual = page.input_value("input[name='imgCode']")
+        if actual != code:
+            print(f"  [เตือน] ช่องรหัสยืนยันอ่านได้ค่า '{actual}' ไม่ตรงกับที่พิมพ์ '{code}' กำลังลองกรอกใหม่")
+            page.fill("input[name='imgCode']", code)
+            actual = page.input_value("input[name='imgCode']")
+            print(f"  [ตรวจสอบ] ค่าในช่องหลังกรอกใหม่: '{actual}'")
 
         dialog_state["message"] = None
         try:
@@ -207,6 +213,15 @@ def process_one(page, record, captcha_path, dialog_state):
         if dialog_state["message"]:
             print(f"  [ไม่ผ่าน] เบราว์เซอร์แจ้งเตือน: {dialog_state['message']} — ลองใหม่อีกครั้ง")
             continue
+
+        # เก็บร่องรอยไว้ช่วยวินิจฉัย: ถ้า CAPTCHA ผิดแบบไม่มี error แจ้งเลย
+        # (เว็บไซต์ไม่แจ้งอะไร) ต้องดูว่าช่อง dfId ยังมีค่าอยู่ไหมหลังกดค้นหา
+        # เพื่อเทียบว่าเป็นการ submit สำเร็จจริงหรือถูกปฏิเสธเงียบๆ
+        try:
+            dfid_after = page.input_value("input[name='dfId']")
+            print(f"  [ตรวจสอบ] ค่า dfId หลังกดค้นหา: '{dfid_after}'")
+        except Exception:
+            pass
 
         return parse_results_table(page)
 
