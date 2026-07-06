@@ -146,8 +146,16 @@ def submit_query(page):
         page.click("#Image31")
 
 
+NOT_FOUND_TEXT = "ไม่พบรายการที่ค้นหา"
+
+
 def parse_results_table(page):
     """คืนค่า (status, detail_text) จากตาราง lkPccBankruptTable หลังค้นหา."""
+    table_text = page.locator("#lkPccBankruptTable").inner_text()
+
+    if NOT_FOUND_TEXT in table_text:
+        return STATUS_CLEAR, ""
+
     rows = page.locator(
         "#scrollContent_lkPccBankruptTable tr:not(.tableEmptyCell)"
     )
@@ -170,7 +178,11 @@ def parse_results_table(page):
 
     if cases:
         return STATUS_FOUND, "; ".join(cases)
-    return STATUS_CLEAR, ""
+
+    # ไม่เจอทั้งข้อความ "ไม่พบรายการที่ค้นหา" และไม่เจอแถวข้อมูลจริง — ไม่ควรเดาว่า
+    # "ไม่พบคดี" เฉยๆ เพราะอาจเป็นกรณี CAPTCHA ผิดที่ไม่มี alert เด้ง (ยังไม่ยืนยัน)
+    # ให้รายงานเป็นสถานะที่ต้องตรวจสอบมือแทน เพื่อความปลอดภัย
+    return STATUS_ERROR, "ไม่พบข้อความยืนยันผลลัพธ์ที่คาดไว้ ควรตรวจสอบด้วยตนเอง"
 
 
 def process_one(page, record, captcha_path, dialog_state):
