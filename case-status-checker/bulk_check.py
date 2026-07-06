@@ -204,6 +204,10 @@ def process_one(page, record, captcha_path, dialog_state):
         if code.lower() == "r":
             continue  # goto ใหม่รอบหน้าจะได้ captcha ใหม่อยู่แล้ว
 
+        imgcode_count = page.locator("input[name='imgCode']").count()
+        if imgcode_count != 1:
+            print(f"  [เตือน] พบช่อง imgCode {imgcode_count} ช่องในหน้า (คาดว่าควรมี 1 ช่อง)")
+
         page.fill("input[name='imgCode']", code)
         actual = page.input_value("input[name='imgCode']")
         if actual != code:
@@ -211,6 +215,12 @@ def process_one(page, record, captcha_path, dialog_state):
             page.fill("input[name='imgCode']", code)
             actual = page.input_value("input[name='imgCode']")
             print(f"  [ตรวจสอบ] ค่าในช่องหลังกรอกใหม่: '{actual}'")
+
+        # หน่วงเล็กน้อยก่อนกดค้นหา แล้วเช็คค่าอีกครั้งทันทีก่อนคลิก เผื่อมีอะไรมาล้างค่า
+        # ในช่วงเวลาสั้นๆ ระหว่างกรอกกับกดค้นหา
+        page.wait_for_timeout(300)
+        actual_before_click = page.input_value("input[name='imgCode']")
+        print(f"  [ตรวจสอบ] ค่าในช่องรหัสยืนยันก่อนกดค้นหา: '{actual_before_click}'")
 
         dialog_state["message"] = None
         try:
