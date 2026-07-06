@@ -1,11 +1,13 @@
 """
 ตรวจสอบสถานะ "บุคคลล้มละลาย" จากเว็บไซต์กรมบังคับคดี (led.go.th) แบบกลุ่ม (bulk)
-โดยอ่านรายชื่อ/เลขบัตรประชาชนจากไฟล์ Excel แล้วกรอกฟอร์มค้นหาให้อัตโนมัติทีละคน
+โดยอ่านรายชื่อ/เลขบัตรประชาชนจากไฟล์ Excel แล้วกรอกเลขบัตรในฟอร์มค้นหาให้อัตโนมัติทีละคน
 
 เนื่องจากฟอร์มค้นหาของกรมบังคับคดีมี CAPTCHA ป้องกันการยิงคำขอซ้ำๆ อัตโนมัติ
-สคริปต์นี้จึง "ไม่พยายามถอดรหัส CAPTCHA เอง" แต่จะเปิดเบราว์เซอร์จริงให้ผู้ใช้เห็น
-และหยุดรอให้ผู้ใช้พิมพ์รหัสที่เห็นในภาพทีละรอบ ส่วนที่เหลือ (ล็อกอิน, กรอกฟอร์ม,
-กดค้นหา, อ่านผลลัพธ์, บันทึกไฟล์) ทำให้อัตโนมัติทั้งหมด
+(และจากการทดสอบจริงพบว่าเว็บไซต์จะล้างค่าช่อง CAPTCHA ทิ้งถ้าเป็นการกรอกด้วยสคริปต์
+แทนที่จะเป็นการพิมพ์จริงของคน) สคริปต์นี้จึง "ไม่แตะช่อง CAPTCHA เลย" ผู้ใช้ต้องเป็น
+คนพิมพ์รหัส CAPTCHA และกดปุ่ม "ค้นหา" เองในเบราว์เซอร์จริงทุกครั้ง ส่วนที่เหลือ
+(ล็อกอิน session ค้าง, กรอกเลขบัตร, อ่านผลลัพธ์, บันทึกไฟล์, ไปรายชื่อถัดไป)
+ทำให้อัตโนมัติทั้งหมด
 
 วิธีใช้งาน:
     pip install -r requirements.txt
@@ -17,20 +19,23 @@
       (พิมพ์ URL, ล็อกอิน, คลิกเมนู) จนกว่าจะเปิดหน้า "สอบถามบุคคลล้มละลาย"
       (WEB3Q010) ได้สำเร็จ 1 ครั้ง แล้วกด Enter ในหน้าต่าง terminal เพื่อให้
       สคริปต์ทำงานต่อ
-    - จากนั้นสำหรับแต่ละรายชื่อ สคริปต์จะกรอกเลขบัตรประชาชนให้ แล้วหยุดรอให้พิมพ์
-      รหัส CAPTCHA ที่เห็นในเบราว์เซอร์ (หรือดูจากไฟล์ captcha.png ที่บันทึกไว้)
+    - จากนั้นสำหรับแต่ละรายชื่อ สคริปต์จะกรอกเลขบัตรประชาชนให้ในหน้าเว็บ แล้วรอ
+      ให้ผู้ใช้ไปที่เบราว์เซอร์ พิมพ์รหัส CAPTCHA และกดปุ่ม "ค้นหา" เอง
+      (ถ้าเผลอพิมพ์ CAPTCHA ผิด เว็บจะแจ้งเตือน กด OK แล้วพิมพ์ใหม่ กดค้นหาอีกครั้ง
+      ได้เลยในหน้าเดิม ไม่ต้องกลับมาที่ terminal จนกว่าจะเห็นผลลัพธ์ขึ้นจริง)
+    - เมื่อเห็นผลลัพธ์ขึ้นในหน้าเว็บแล้ว กลับมาที่ terminal แล้วกด Enter สคริปต์จะ
+      อ่านผลลัพธ์ บันทึกลงไฟล์ แล้วพาไปหน้าค้นหาว่างสำหรับรายชื่อถัดไปให้เอง
     - ผลลัพธ์จะถูกบันทึกลงไฟล์ Excel ทันทีหลังตรวจแต่ละราย ถ้าสคริปต์ถูกปิดกลางคัน
       รันคำสั่งเดิมซ้ำได้เลย มันจะข้ามรายชื่อที่ตรวจสอบไปแล้วในไฟล์ผลลัพธ์โดยอัตโนมัติ
 
 หมายเหตุสำคัญ: สคริปต์นี้เขียนจาก HTML จริงของหน้าฟอร์ม "สอบถามบุคคลล้มละลาย"
-(WEB3Q010) แต่ยังไม่เคยรันกับระบบจริง แนะนำให้ทดสอบกับรายชื่อ 3-5 รายก่อน
-(--limit 5) แล้วตรวจสอบผลลัพธ์ให้ตรงกับที่เห็นในเบราว์เซอร์จริง ก่อนรันเต็มจำนวน
+(WEB3Q010) และข้อความ "ไม่พบรายการที่ค้นหา" ที่ยืนยันจากการทดสอบจริงแล้ว แต่ยังควร
+ทดสอบกับรายชื่อ 3-5 รายก่อน (--limit 5) แล้วตรวจสอบผลลัพธ์ให้ตรงกับที่เห็นในเบราว์เซอร์
+จริง ก่อนรันเต็มจำนวน
 """
 
 import argparse
 import datetime as dt
-import sys
-import time
 from pathlib import Path
 
 import openpyxl
@@ -42,6 +47,8 @@ STATUS_CLEAR = "ไม่พบคดี"
 STATUS_FOUND = "พบคดี"
 STATUS_ERROR = "ตรวจสอบไม่สำเร็จ"
 
+NOT_FOUND_TEXT = "ไม่พบรายการที่ค้นหา"
+
 OUTPUT_HEADERS = [
     "เลขทะเบียนสมาชิก",
     "เลขบัตรประชาชน",
@@ -50,8 +57,6 @@ OUTPUT_HEADERS = [
     "รายละเอียดคดีที่พบ",
     "ตรวจสอบเมื่อ",
 ]
-
-MAX_CAPTCHA_ATTEMPTS = 5
 
 
 def read_input_rows(path, sheet_name, id_col, member_col, name_col):
@@ -106,47 +111,9 @@ def append_result(wb, ws, output_path, record, status, detail):
     wb.save(output_path)
 
 
-def setup_dialog_capture(page):
-    """ดักจับ popup alert() จริงๆ ของเบราว์เซอร์ (ไม่ใช่การเดาจากข้อความในหน้า HTML
-    เพราะข้อความแจ้งเตือนบางอย่าง เช่น 'กรุณาระบุ...' ถูกฝังอยู่ใน <script> ของทุกหน้า
-    เสมออยู่แล้ว ต่อให้ไม่มี error จริงก็จะเจอข้อความนั้นใน page.content())."""
-    state = {"message": None}
-
-    def handler(dialog):
-        state["message"] = dialog.message
-        dialog.accept()
-
-    page.on("dialog", handler)
-    return state
-
-
 def fill_search_form(page, record):
     page.fill("input[name='dfId']", record["id"])
     page.check("input[name='typeQuery'][value='1']")  # ตรงตัว (exact match) สำหรับค้นด้วยเลขบัตร
-
-
-def screenshot_captcha(page, path):
-    try:
-        page.locator("#imgCaptcha").screenshot(path=path)
-        return True
-    except Exception:
-        return False
-
-
-def refresh_captcha(page):
-    try:
-        page.click("input[onclick*='refresh']")
-        page.wait_for_timeout(500)
-    except Exception:
-        pass
-
-
-def submit_query(page):
-    with page.expect_navigation(wait_until="networkidle", timeout=30000):
-        page.click("#Image31")
-
-
-NOT_FOUND_TEXT = "ไม่พบรายการที่ค้นหา"
 
 
 def parse_results_table(page):
@@ -179,75 +146,27 @@ def parse_results_table(page):
     if cases:
         return STATUS_FOUND, "; ".join(cases)
 
-    # ไม่เจอทั้งข้อความ "ไม่พบรายการที่ค้นหา" และไม่เจอแถวข้อมูลจริง — ไม่ควรเดาว่า
-    # "ไม่พบคดี" เฉยๆ เพราะอาจเป็นกรณี CAPTCHA ผิดที่ไม่มี alert เด้ง (ยังไม่ยืนยัน)
-    # ให้รายงานเป็นสถานะที่ต้องตรวจสอบมือแทน เพื่อความปลอดภัย
-    return STATUS_ERROR, "ไม่พบข้อความยืนยันผลลัพธ์ที่คาดไว้ ควรตรวจสอบด้วยตนเอง"
+    # ไม่เจอทั้งข้อความ "ไม่พบรายการที่ค้นหา" และไม่เจอแถวข้อมูลจริง — อาจแปลว่า
+    # ยังไม่ได้กดค้นหา หรือ CAPTCHA ยังไม่ผ่าน ไม่ควรเดาว่า "ไม่พบคดี" เฉยๆ
+    return STATUS_ERROR, "ไม่พบข้อความยืนยันผลลัพธ์ที่คาดไว้ในตาราง ควรตรวจสอบด้วยตนเอง"
 
 
-def process_one(page, record, captcha_path, dialog_state):
-    """คืนค่า (status, detail)"""
-    for attempt in range(1, MAX_CAPTCHA_ATTEMPTS + 1):
-        page.goto(FORM_URL, wait_until="networkidle")
-        fill_search_form(page, record)
-        screenshot_captcha(page, captcha_path)
+def process_one(page, record):
+    """คืนค่า (status, detail). ผู้ใช้เป็นคนพิมพ์ CAPTCHA และกดค้นหาเองในเบราว์เซอร์."""
+    page.goto(FORM_URL, wait_until="networkidle")
+    fill_search_form(page, record)
 
-        print(
-            f"\n  ผู้ตรวจสอบ: {record['name']}  เลขบัตร: {record['id']}"
-            f"  (ครั้งที่ลอง {attempt}/{MAX_CAPTCHA_ATTEMPTS})"
-        )
-        print(f"  ดูรหัส CAPTCHA ในเบราว์เซอร์ หรือเปิดไฟล์: {captcha_path}")
-        code = input("  พิมพ์รหัส CAPTCHA (พิมพ์ 'r' เพื่อขอรหัสใหม่, 's' เพื่อข้ามรายนี้): ").strip()
+    print(f"\n  ผู้ตรวจสอบ: {record['name']}  เลขบัตร: {record['id']}")
+    print("  กรอกเลขบัตรในหน้าเว็บให้แล้ว — ไปที่เบราว์เซอร์ พิมพ์รหัส CAPTCHA แล้วกดปุ่ม")
+    print("  \"ค้นหา\" เองในหน้าเว็บ (ถ้า CAPTCHA ผิด เว็บจะแจ้งเตือน กด OK แล้วลองใหม่ได้เลย)")
+    response = input(
+        "  เห็นผลลัพธ์ขึ้นในหน้าเว็บแล้ว กด Enter ที่นี่ (หรือพิมพ์ 's' เพื่อข้ามรายนี้): "
+    ).strip()
 
-        if code.lower() == "s":
-            return STATUS_ERROR, "ผู้ใช้เลือกข้ามรายนี้"
-        if code.lower() == "r":
-            continue  # goto ใหม่รอบหน้าจะได้ captcha ใหม่อยู่แล้ว
+    if response.lower() == "s":
+        return STATUS_ERROR, "ผู้ใช้เลือกข้ามรายนี้"
 
-        imgcode_count = page.locator("input[name='imgCode']").count()
-        if imgcode_count != 1:
-            print(f"  [เตือน] พบช่อง imgCode {imgcode_count} ช่องในหน้า (คาดว่าควรมี 1 ช่อง)")
-
-        page.fill("input[name='imgCode']", code)
-        actual = page.input_value("input[name='imgCode']")
-        if actual != code:
-            print(f"  [เตือน] ช่องรหัสยืนยันอ่านได้ค่า '{actual}' ไม่ตรงกับที่พิมพ์ '{code}' กำลังลองกรอกใหม่")
-            page.fill("input[name='imgCode']", code)
-            actual = page.input_value("input[name='imgCode']")
-            print(f"  [ตรวจสอบ] ค่าในช่องหลังกรอกใหม่: '{actual}'")
-
-        # หน่วงเล็กน้อยก่อนกดค้นหา แล้วเช็คค่าอีกครั้งทันทีก่อนคลิก เผื่อมีอะไรมาล้างค่า
-        # ในช่วงเวลาสั้นๆ ระหว่างกรอกกับกดค้นหา
-        page.wait_for_timeout(300)
-        actual_before_click = page.input_value("input[name='imgCode']")
-        print(f"  [ตรวจสอบ] ค่าในช่องรหัสยืนยันก่อนกดค้นหา: '{actual_before_click}'")
-
-        dialog_state["message"] = None
-        try:
-            submit_query(page)
-        except Exception as e:
-            if dialog_state["message"]:
-                print(f"  [ไม่ผ่าน] เบราว์เซอร์แจ้งเตือน: {dialog_state['message']} — ลองใหม่อีกครั้ง")
-            else:
-                print(f"  [เตือน] การกดค้นหา/รอโหลดหน้ามีปัญหา: {e}")
-            continue
-
-        if dialog_state["message"]:
-            print(f"  [ไม่ผ่าน] เบราว์เซอร์แจ้งเตือน: {dialog_state['message']} — ลองใหม่อีกครั้ง")
-            continue
-
-        # เก็บร่องรอยไว้ช่วยวินิจฉัย: ถ้า CAPTCHA ผิดแบบไม่มี error แจ้งเลย
-        # (เว็บไซต์ไม่แจ้งอะไร) ต้องดูว่าช่อง dfId ยังมีค่าอยู่ไหมหลังกดค้นหา
-        # เพื่อเทียบว่าเป็นการ submit สำเร็จจริงหรือถูกปฏิเสธเงียบๆ
-        try:
-            dfid_after = page.input_value("input[name='dfId']")
-            print(f"  [ตรวจสอบ] ค่า dfId หลังกดค้นหา: '{dfid_after}'")
-        except Exception:
-            pass
-
-        return parse_results_table(page)
-
-    return STATUS_ERROR, "พิมพ์ CAPTCHA ผิดครบจำนวนครั้งที่กำหนด หรือระบบไม่ยอมรับซ้ำๆ"
+    return parse_results_table(page)
 
 
 def main():
@@ -259,7 +178,6 @@ def main():
     parser.add_argument("--name-col", type=int, default=2, help="index คอลัมน์ชื่อ-นามสกุล (0=A)")
     parser.add_argument("--output", default="results.xlsx", help="ไฟล์ผลลัพธ์ (จะสร้าง/ต่อท้ายให้)")
     parser.add_argument("--limit", type=int, default=0, help="จำกัดจำนวนรายชื่อที่จะตรวจ (0 = ไม่จำกัด) ใช้สำหรับทดสอบ")
-    parser.add_argument("--captcha-image", default="captcha.png", help="ไฟล์ที่จะบันทึกรูป CAPTCHA ล่าสุด")
     args = parser.parse_args()
 
     print(f"กำลังอ่านไฟล์ input: {args.input} (ชีต {args.sheet})")
@@ -285,13 +203,12 @@ def main():
         browser = p.chromium.launch(headless=False)
         context = browser.new_context()
         page = context.new_page()
-        dialog_state = setup_dialog_capture(page)
 
         print("=" * 60)
         print("ในหน้าต่างเบราว์เซอร์ที่เปิดขึ้นมา กรุณาพิมพ์ URL แล้วนำทางไปด้วยตนเอง")
         print("เหมือนที่คุณทำเป็นปกติ จนกว่าจะเข้าสู่ระบบและเปิดหน้า")
         print("'สอบถามบุคคลล้มละลาย' (WEB3Q010) ได้สำเร็จ 1 ครั้ง")
-        print("เสร็จแล้วกลับมาที่ terminal นี้แล้วกด Enter เพื่อเริ่มตรวจสอบอัตโนมัติ")
+        print("เสร็จแล้วกลับมาที่ terminal นี้แล้วกด Enter เพื่อเริ่มตรวจสอบ")
         print("=" * 60)
         input()
 
@@ -300,7 +217,7 @@ def main():
         for idx, record in enumerate(remaining, start=1):
             print(f"\n[{idx}/{total}] ===================================")
             try:
-                status, detail = process_one(page, record, args.captcha_image, dialog_state)
+                status, detail = process_one(page, record)
             except KeyboardInterrupt:
                 print("\nหยุดโดยผู้ใช้ — ผลลัพธ์ที่ตรวจไปแล้วถูกบันทึกไว้แล้ว")
                 break
