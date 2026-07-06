@@ -13,9 +13,10 @@
     python bulk_check.py --input CardID.xlsx --sheet 0769 --output results.xlsx
 
 ระหว่างรัน:
-    - สคริปต์จะเปิดเบราว์เซอร์และพาไปหน้า login ของ ledwebsite.led.go.th
-      ให้ผู้ใช้ล็อกอินเองในเบราว์เซอร์นั้น (ไม่ว่าจะล็อกอินด้วยวิธีใดก็ตาม)
-      แล้วกด Enter ในหน้าต่าง terminal เพื่อให้สคริปต์ทำงานต่อ
+    - สคริปต์จะเปิดเบราว์เซอร์เปล่าขึ้นมา ให้ผู้ใช้นำทาง/ล็อกอินเองตามปกติ
+      (พิมพ์ URL, ล็อกอิน, คลิกเมนู) จนกว่าจะเปิดหน้า "สอบถามบุคคลล้มละลาย"
+      (WEB3Q010) ได้สำเร็จ 1 ครั้ง แล้วกด Enter ในหน้าต่าง terminal เพื่อให้
+      สคริปต์ทำงานต่อ
     - จากนั้นสำหรับแต่ละรายชื่อ สคริปต์จะกรอกเลขบัตรประชาชนให้ แล้วหยุดรอให้พิมพ์
       รหัส CAPTCHA ที่เห็นในเบราว์เซอร์ (หรือดูจากไฟล์ captcha.png ที่บันทึกไว้)
     - ผลลัพธ์จะถูกบันทึกลงไฟล์ Excel ทันทีหลังตรวจแต่ละราย ถ้าสคริปต์ถูกปิดกลางคัน
@@ -35,7 +36,6 @@ from pathlib import Path
 import openpyxl
 from playwright.sync_api import sync_playwright
 
-BASE_URL = "https://ledwebsite.led.go.th/ledweb/"
 FORM_URL = "https://ledwebsite.led.go.th/ledweb/led/web/system/WEB3Q010Action.do"
 
 STATUS_CLEAR = "ไม่พบคดี"
@@ -244,10 +244,11 @@ def main():
         context = browser.new_context()
         page = context.new_page()
 
-        page.goto(BASE_URL, wait_until="networkidle")
         print("=" * 60)
-        print("กรุณา LOGIN ในหน้าต่างเบราว์เซอร์ที่เปิดขึ้นมาด้วยตนเอง")
-        print("ล็อกอินเสร็จแล้ว กลับมาที่ terminal นี้แล้วกด Enter เพื่อเริ่มตรวจสอบ")
+        print("ในหน้าต่างเบราว์เซอร์ที่เปิดขึ้นมา กรุณาพิมพ์ URL แล้วนำทางไปด้วยตนเอง")
+        print("เหมือนที่คุณทำเป็นปกติ จนกว่าจะเข้าสู่ระบบและเปิดหน้า")
+        print("'สอบถามบุคคลล้มละลาย' (WEB3Q010) ได้สำเร็จ 1 ครั้ง")
+        print("เสร็จแล้วกลับมาที่ terminal นี้แล้วกด Enter เพื่อเริ่มตรวจสอบอัตโนมัติ")
         print("=" * 60)
         input()
 
