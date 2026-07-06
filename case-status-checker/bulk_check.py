@@ -106,16 +106,18 @@ def append_result(wb, ws, output_path, record, status, detail):
     wb.save(output_path)
 
 
-def page_has_error_text(page):
-    """ตรวจข้อความ error ที่อาจแสดงผลบนหน้า (CAPTCHA ผิด / กรอกไม่ครบ ฯลฯ)."""
-    try:
-        text = page.content()
-    except Exception:
-        return None
-    for marker in ["รหัสยืนยันไม่ถูกต้อง", "รหัสภาพไม่ถูกต้อง", "กรุณาระบุ", "Invalid captcha"]:
-        if marker in text:
-            return marker
-    return None
+def setup_dialog_capture(page):
+    """ดักจับ popup alert() จริงๆ ของเบราว์เซอร์ (ไม่ใช่การเดาจากข้อความในหน้า HTML
+    เพราะข้อความแจ้งเตือนบางอย่าง เช่น 'กรุณาระบุ...' ถูกฝังอยู่ใน <script> ของทุกหน้า
+    เสมออยู่แล้ว ต่อให้ไม่มี error จริงก็จะเจอข้อความนั้นใน page.content())."""
+    state = {"message": None}
+
+    def handler(dialog):
+        state["message"] = dialog.message
+        dialog.accept()
+
+    page.on("dialog", handler)
+    return state
 
 
 def fill_search_form(page, record):
@@ -171,7 +173,7 @@ def parse_results_table(page):
     return STATUS_CLEAR, ""
 
 
-def process_one(page, record, captcha_path):
+def process_one(page, record, captcha_path, dialog_state):
     """คืนค่า (status, detail)"""
     for attempt in range(1, MAX_CAPTCHA_ATTEMPTS + 1):
         page.goto(FORM_URL, wait_until="networkidle")
@@ -192,20 +194,23 @@ def process_one(page, record, captcha_path):
 
         page.fill("input[name='imgCode']", code)
 
+        dialog_state["message"] = None
         try:
             submit_query(page)
         except Exception as e:
-            print(f"  [เตือน] การกดค้นหา/รอโหลดหน้ามีปัญหา: {e}")
+            if dialog_state["message"]:
+                print(f"  [ไม่ผ่าน] เบราว์เซอร์แจ้งเตือน: {dialog_state['message']} — ลองใหม่อีกครั้ง")
+            else:
+                print(f"  [เตือน] การกดค้นหา/รอโหลดหน้ามีปัญหา: {e}")
             continue
 
-        error_marker = page_has_error_text(page)
-        if error_marker:
-            print(f"  [ไม่ผ่าน] ระบบแจ้งว่า: {error_marker} — ลองใหม่อีกครั้ง")
+        if dialog_state["message"]:
+            print(f"  [ไม่ผ่าน] เบราว์เซอร์แจ้งเตือน: {dialog_state['message']} — ลองใหม่อีกครั้ง")
             continue
 
         return parse_results_table(page)
 
-    return STATUS_ERROR, "พิมพ์ CAPTCHA ผิดครบจำนวนครั้งที่กำหนด"
+    return STATUS_ERROR, "พิมพ์ CAPTCHA ผิดครบจำนวนครั้งที่กำหนด หรือระบบไม่ยอมรับซ้ำๆ"
 
 
 def main():
@@ -243,6 +248,7 @@ def main():
         browser = p.chromium.launch(headless=False)
         context = browser.new_context()
         page = context.new_page()
+        dialog_state = setup_dialog_capture(page)
 
         print("=" * 60)
         print("ในหน้าต่างเบราว์เซอร์ที่เปิดขึ้นมา กรุณาพิมพ์ URL แล้วนำทางไปด้วยตนเอง")
@@ -257,7 +263,7 @@ def main():
         for idx, record in enumerate(remaining, start=1):
             print(f"\n[{idx}/{total}] ===================================")
             try:
-                status, detail = process_one(page, record, args.captcha_image)
+                status, detail = process_one(page, record, args.captcha_image, dialog_state)
             except KeyboardInterrupt:
                 print("\nหยุดโดยผู้ใช้ — ผลลัพธ์ที่ตรวจไปแล้วถูกบันทึกไว้แล้ว")
                 break
