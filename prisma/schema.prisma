@@ -1,0 +1,216 @@
+// Prisma schema — MVP โมดูล 1: เงินฝาก-หุ้น-เงินกู้ของสมาชิก
+// เงินทุกจำนวนเก็บเป็นจำนวนเต็มหน่วยสตางค์ (Int, minor units) เพื่อเลี่ยงปัญหาปัดเศษของ float
+// dev ใช้ SQLite ผ่าน driver adapter, การย้ายไป PostgreSQL ทำได้โดยเปลี่ยน provider/adapter เท่านั้น
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum MemberStatus {
+  ACTIVE
+  RETIRED
+  RESIGNED
+}
+
+enum MemberType {
+  ORDINARY
+  ASSOCIATE
+}
+
+enum UserRole {
+  STAFF_FINANCE
+  STAFF_LOAN
+  MANAGER
+  ADMIN
+  MEMBER
+}
+
+enum SavingsAccountType {
+  SAVINGS
+  SPECIAL_SAVINGS
+  FIXED_TERM
+}
+
+enum LoanType {
+  EMERGENCY
+  ORDINARY
+  SPECIAL
+}
+
+enum LoanStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  DISBURSED
+  CLOSED
+  REJECTED
+}
+
+enum InstallmentStatus {
+  PENDING
+  PARTIAL
+  PAID
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  SHARE_CONTRIBUTION
+  LOAN_DISBURSEMENT
+  LOAN_PAYMENT
+  INTEREST_ACCRUAL
+}
+
+model Member {
+  id          String       @id @default(cuid())
+  memberCode  String       @unique
+  fullName    String
+  nationalId  String       @unique
+  status      MemberStatus @default(ACTIVE)
+  memberType  MemberType   @default(ORDINARY)
+  affiliation String
+  createdAt   DateTime     @default(now())
+
+  user            User?
+  savingsAccounts SavingsAccount[]
+  shareAccount    ShareAccount?
+  loanContracts   LoanContract[]
+  guarantorFor    LoanGuarantor[]
+  transactions    Transaction[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  role         UserRole
+  createdAt    DateTime @default(now())
+
+  memberId String? @unique
+  member   Member? @relation(fields: [memberId], references: [id])
+
+  createdTransactions Transaction[]
+  auditLogs           AuditLog[]
+}
+
+model SavingsAccount {
+  id              String             @id @default(cuid())
+  accountNumber   String             @unique
+  type            SavingsAccountType
+  balanceMinor    Int                @default(0)
+  interestRateBps Int
+  openedAt        DateTime           @default(now())
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id])
+
+  transactions Transaction[]
+}
+
+model ShareAccount {
+  id                        String   @id @default(cuid())
+  balanceMinor              Int      @default(0)
+  monthlyContributionMinor  Int
+  openedAt                  DateTime @default(now())
+
+  memberId String @unique
+  member   Member @relation(fields: [memberId], references: [id])
+
+  transactions Transaction[]
+}
+
+model LoanContract {
+  id              String     @id @default(cuid())
+  type            LoanType
+  principalMinor  Int
+  interestRateBps Int
+  termMonths      Int
+  status          LoanStatus @default(DRAFT)
+  collateralNote  String?
+  createdAt       DateTime   @default(now())
+  approvedAt      DateTime?
+  disbursedAt     DateTime?
+  closedAt        DateTime?
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id])
+
+  guarantors   LoanGuarantor[]
+  installments LoanInstallment[]
+  transactions Transaction[]
+}
+
+model LoanGuarantor {
+  id                    String @id @default(cuid())
+  guaranteedAmountMinor Int
+
+  loanContractId String
+  loanContract   LoanContract @relation(fields: [loanContractId], references: [id])
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id])
+
+  @@unique([loanContractId, memberId])
+}
+
+model LoanInstallment {
+  id                String            @id @default(cuid())
+  installmentNo     Int
+  dueDate           DateTime
+  principalDueMinor Int
+  interestDueMinor  Int
+  paidMinor         Int               @default(0)
+  paidAt            DateTime?
+  status            InstallmentStatus @default(PENDING)
+
+  loanContractId String
+  loanContract   LoanContract @relation(fields: [loanContractId], references: [id])
+
+  transactions Transaction[]
+
+  @@unique([loanContractId, installmentNo])
+}
+
+model Transaction {
+  id          String          @id @default(cuid())
+  type        TransactionType
+  amountMinor Int
+  note        String?
+  createdAt   DateTime        @default(now())
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id])
+
+  savingsAccountId String?
+  savingsAccount   SavingsAccount? @relation(fields: [savingsAccountId], references: [id])
+
+  shareAccountId String?
+  shareAccount   ShareAccount? @relation(fields: [shareAccountId], references: [id])
+
+  loanContractId String?
+  loanContract   LoanContract? @relation(fields: [loanContractId], references: [id])
+
+  loanInstallmentId String?
+  loanInstallment   LoanInstallment? @relation(fields: [loanInstallmentId], references: [id])
+
+  createdByUserId String
+  createdByUser   User   @relation(fields: [createdByUserId], references: [id])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  action     String
+  entityType String
+  entityId   String
+  before     String?
+  after      String?
+  createdAt  DateTime @default(now())
+
+  actorUserId String
+  actorUser   User   @relation(fields: [actorUserId], references: [id])
+}
