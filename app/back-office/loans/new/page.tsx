@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getSession, LOAN_ROLES } from "@/lib/session";
 import { NewLoanForm } from "./new-loan-form";
 
 export default async function NewLoanPage({
@@ -6,6 +8,11 @@ export default async function NewLoanPage({
 }: {
   searchParams: Promise<{ memberId?: string }>;
 }) {
+  const session = await getSession();
+  if (!session || !LOAN_ROLES.includes(session.role)) {
+    redirect("/back-office/loans");
+  }
+
   const { memberId } = await searchParams;
   const members = await prisma.member.findMany({
     orderBy: { fullName: "asc" },

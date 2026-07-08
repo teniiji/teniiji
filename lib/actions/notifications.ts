@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireRole, STAFF_ROLES } from "@/lib/session";
+import { requireRole, STAFF_ROLES, FINANCE_ROLES } from "@/lib/session";
 import { notifyMember } from "@/lib/notify";
 import { formatBaht } from "@/lib/money";
 import type { ActionState } from "@/lib/actions/members";
@@ -12,7 +12,7 @@ export async function createAnnouncementAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const session = await requireRole([...STAFF_ROLES]);
+  const session = await requireRole(STAFF_ROLES);
 
   const title = String(formData.get("title") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
@@ -43,7 +43,7 @@ export async function sendDueSoonRemindersAction(
   _prevState: ActionState,
   _formData: FormData
 ): Promise<ActionState> {
-  await requireRole(["STAFF_FINANCE", "MANAGER", "ADMIN"]);
+  await requireRole(FINANCE_ROLES);
 
   const now = new Date();
   const windowEnd = new Date(now.getTime() + REMINDER_WINDOW_DAYS * 24 * 60 * 60 * 1000);
@@ -56,22 +56,35 @@ export async function sendDueSoonRemindersAction(
     include: { loanContract: { include: { member: true } } },
   });
 
-  let sentCount = 0;
-  for (const inst of dueSoon) {
-    const marker = `installment:${inst.id}`;
-    const already = await prisma.notification.findFirst({
-      where: { body: { contains: marker } },
-    });
-    if (already) continue;
+  const alreadyNotified =
+    dueSoon.length === 0
+      ? []
+      : await prisma.notification.findMany({
+          where: {
+            OR: dueSoon.map((inst) => ({ body: { contains: `installment:${inst.id}` } })),
+          },
+          select: { body: true },
+        });
+  const notifiedMarkers = new Set(
+    dueSoon
+      .map((inst) => `installment:${inst.id}`)
+      .filter((marker) => alreadyNotified.some((n) => n.body.includes(marker)))
+  );
 
-    const amountDueMinor = inst.principalDueMinor + inst.interestDueMinor - inst.paidMinor;
-    await notifyMember({
-      memberId: inst.loanContract.memberId,
-      title: "แจ้งเตือนงวดเงินกู้ใกล้ครบกำหนดชำระ",
-      body: `งวดที่ ${inst.installmentNo} ครบกำหนดวันที่ ${inst.dueDate.toLocaleDateString("th-TH")} ยอด ${formatBaht(amountDueMinor)} กรุณาชำระภายในกำหนด (${marker})`,
-    });
-    sentCount += 1;
-  }
+  const toNotify = dueSoon.filter((inst) => !notifiedMarkers.has(`installment:${inst.id}`));
+
+  await Promise.all(
+    toNotify.map((inst) => {
+      const marker = `installment:${inst.id}`;
+      const amountDueMinor = inst.principalDueMinor + inst.interestDueMinor - inst.paidMinor;
+      return notifyMember({
+        memberId: inst.loanContract.memberId,
+        title: "แจ้งเตือนงวดเงินกู้ใกล้ครบกำหนดชำระ",
+        body: `งวดที่ ${inst.installmentNo} ครบกำหนดวันที่ ${inst.dueDate.toLocaleDateString("th-TH")} ยอด ${formatBaht(amountDueMinor)} กรุณาชำระภายในกำหนด (${marker})`,
+      });
+    })
+  );
+  const sentCount = toNotify.length;
 
   revalidatePath("/back-office/notifications");
   return {

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatBaht } from "@/lib/money";
+import { getSession, MANAGER_ADMIN_ROLES } from "@/lib/session";
 import { CreateFundForm } from "./create-fund-form";
 
 const FUND_TYPE_LABEL: Record<string, string> = {
@@ -24,6 +25,9 @@ const CLAIM_STATUS_BADGE: Record<string, string> = {
 };
 
 export default async function WelfarePage() {
+  const session = await getSession();
+  const canManageFunds = !!session && MANAGER_ADMIN_ROLES.includes(session.role);
+
   const [funds, claims] = await Promise.all([
     prisma.welfareFund.findMany({ orderBy: { createdAt: "desc" } }),
     prisma.welfareClaim.findMany({
@@ -50,7 +54,7 @@ export default async function WelfarePage() {
         </Link>
       </div>
 
-      <CreateFundForm />
+      {canManageFunds && <CreateFundForm />}
 
       <section className="rounded-lg border border-line bg-surface p-5">
         <h2 className="text-sm font-bold text-ink">กองทุนสวัสดิการ</h2>

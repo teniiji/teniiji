@@ -2,13 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireRole, FINANCE_ADMIN_ROLES } from "@/lib/session";
 import { bahtToMinor, formatBaht } from "@/lib/money";
 import { parseCsv, stripHeaderIfPresent } from "@/lib/csv";
 import { notifyMember } from "@/lib/notify";
 import type { ActionState } from "@/lib/actions/members";
-
-const RECONCILIATION_ROLES = ["STAFF_FINANCE", "ADMIN"] as const;
 
 /**
  * นำเข้าผลการหักเงินเดือนจริงจากต้นสังกัด — จับคู่กับ PayrollDeductionRecord ในงวดที่เลือก
@@ -18,7 +16,7 @@ export async function importPayrollResultAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const session = await requireRole([...RECONCILIATION_ROLES]);
+  const session = await requireRole(FINANCE_ADMIN_ROLES);
   const billingRunId = String(formData.get("billingRunId") ?? "");
   const file = formData.get("file");
 
@@ -54,23 +52,30 @@ export async function importPayrollResultAction(
       },
     });
 
+    const itemsToCreate: Array<{
+      importBatchId: string;
+      rawMemberCode: string;
+      amountMinor: number;
+      status: "UNMATCHED" | "RESOLVED";
+      memberId: string | null;
+      note: string;
+    }> = [];
+
     for (const [rawMemberCode, rawAmount] of rows) {
       const amountMinor = bahtToMinor(Number(rawAmount));
       const memberId = memberByCode.get(rawMemberCode) ?? null;
       const record = memberId ? recordByMemberId.get(memberId) : undefined;
 
       if (!memberId || !record) {
-        await tx.reconciliationItem.create({
-          data: {
-            importBatchId: batch.id,
-            rawMemberCode,
-            amountMinor,
-            status: "UNMATCHED",
-            memberId,
-            note: !memberId
-              ? "ไม่พบรหัสสมาชิกนี้ในระบบ"
-              : "ไม่พบรายการเรียกเก็บของสมาชิกนี้ในงวดที่เลือก",
-          },
+        itemsToCreate.push({
+          importBatchId: batch.id,
+          rawMemberCode,
+          amountMinor,
+          status: "UNMATCHED",
+          memberId,
+          note: !memberId
+            ? "ไม่พบรหัสสมาชิกนี้ในระบบ"
+            : "ไม่พบรายการเรียกเก็บของสมาชิกนี้ในงวดที่เลือก",
         });
         continue;
       }
@@ -88,17 +93,17 @@ export async function importPayrollResultAction(
             ? `หักเกิน ${formatBaht(diff)}`
             : `หักขาด ${formatBaht(-diff)}`;
 
-      await tx.reconciliationItem.create({
-        data: {
-          importBatchId: batch.id,
-          rawMemberCode,
-          amountMinor,
-          memberId,
-          status: "RESOLVED",
-          note,
-        },
+      itemsToCreate.push({
+        importBatchId: batch.id,
+        rawMemberCode,
+        amountMinor,
+        memberId,
+        status: "RESOLVED",
+        note,
       });
     }
+
+    await tx.reconciliationItem.createMany({ data: itemsToCreate });
 
     await tx.auditLog.create({
       data: {
@@ -126,7 +131,7 @@ export async function importBankStatementAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const session = await requireRole([...RECONCILIATION_ROLES]);
+  const session = await requireRole(FINANCE_ADMIN_ROLES);
   const label = String(formData.get("label") ?? "").trim();
   const file = formData.get("file");
 
@@ -152,21 +157,20 @@ export async function importBankStatementAction(
       },
     });
 
-    for (const [rawMemberCode, rawAmount, rawNote] of rows) {
+    const itemsToCreate = rows.map(([rawMemberCode, rawAmount, rawNote]) => {
       const amountMinor = bahtToMinor(Number(rawAmount));
       const memberId = memberByCode.get(rawMemberCode) ?? null;
+      return {
+        importBatchId: batch.id,
+        rawMemberCode,
+        amountMinor,
+        memberId,
+        note: rawNote || null,
+        status: memberId ? ("MATCHED" as const) : ("UNMATCHED" as const),
+      };
+    });
 
-      await tx.reconciliationItem.create({
-        data: {
-          importBatchId: batch.id,
-          rawMemberCode,
-          amountMinor,
-          memberId,
-          note: rawNote || null,
-          status: memberId ? "MATCHED" : "UNMATCHED",
-        },
-      });
-    }
+    await tx.reconciliationItem.createMany({ data: itemsToCreate });
 
     await tx.auditLog.create({
       data: {
@@ -190,7 +194,7 @@ export async function assignReconciliationMemberAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  await requireRole([...RECONCILIATION_ROLES]);
+  await requireRole(FINANCE_ADMIN_ROLES);
   const reconciliationItemId = String(formData.get("reconciliationItemId") ?? "");
   const memberCode = String(formData.get("memberCode") ?? "").trim();
 
@@ -218,7 +222,7 @@ export async function resolveReconciliationItemAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const session = await requireRole([...RECONCILIATION_ROLES]);
+  const session = await requireRole(FINANCE_ADMIN_ROLES);
   const reconciliationItemId = String(formData.get("reconciliationItemId") ?? "");
 
   const item = await prisma.reconciliationItem.findUnique({
@@ -282,13 +286,13 @@ export async function ignoreReconciliationItemAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  await requireRole([...RECONCILIATION_ROLES]);
+  await requireRole(FINANCE_ADMIN_ROLES);
   const reconciliationItemId = String(formData.get("reconciliationItemId") ?? "");
 
   const item = await prisma.reconciliationItem.findUnique({
     where: { id: reconciliationItemId },
   });
-  if (!item || item.status === "RESOLVED") {
+  if (!item || (item.status !== "UNMATCHED" && item.status !== "MATCHED")) {
     return { error: "รายการนี้ไม่อยู่ในสถานะที่ละเว้นได้" };
   }
 

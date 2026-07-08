@@ -2,12 +2,19 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { formatBaht } from "@/lib/money";
+import { getSession, FINANCE_ROLES, LOAN_ROLES } from "@/lib/session";
 import { DepositWithdrawForm, ShareContributionForm } from "./account-forms";
 
 const SAVINGS_TYPE_LABEL: Record<string, string> = {
   SAVINGS: "ออมทรัพย์",
   SPECIAL_SAVINGS: "ออมทรัพย์พิเศษ",
   FIXED_TERM: "เงินฝากประจำ",
+};
+
+const LOAN_TYPE_LABEL: Record<string, string> = {
+  EMERGENCY: "เงินกู้ฉุกเฉิน",
+  ORDINARY: "เงินกู้สามัญ",
+  SPECIAL: "เงินกู้พิเศษ",
 };
 
 const LOAN_STATUS_LABEL: Record<string, string> = {
@@ -35,6 +42,9 @@ export default async function MemberDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const session = await getSession();
+  const canManageFinance = !!session && FINANCE_ROLES.includes(session.role);
+  const canCreateLoan = !!session && LOAN_ROLES.includes(session.role);
 
   const member = await prisma.member.findUnique({
     where: { id },
@@ -85,7 +95,9 @@ export default async function MemberDetailPage({
                   {formatBaht(acc.balanceMinor)}
                 </p>
               </div>
-              <DepositWithdrawForm savingsAccountId={acc.id} memberId={member.id} />
+              {canManageFinance && (
+                <DepositWithdrawForm savingsAccountId={acc.id} memberId={member.id} />
+              )}
             </div>
           ))}
         </div>
@@ -99,22 +111,26 @@ export default async function MemberDetailPage({
               {formatBaht(member.shareAccount.balanceMinor)}
             </p>
           </div>
-          <ShareContributionForm
-            shareAccountId={member.shareAccount.id}
-            memberId={member.id}
-          />
+          {canManageFinance && (
+            <ShareContributionForm
+              shareAccountId={member.shareAccount.id}
+              memberId={member.id}
+            />
+          )}
         </section>
       )}
 
       <section className="rounded-lg border border-line bg-surface p-5">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-ink">เงินกู้</h2>
-          <Link
-            href={`/back-office/loans/new?memberId=${member.id}`}
-            className="text-sm text-primary hover:underline"
-          >
-            + สร้างคำขอกู้ใหม่
-          </Link>
+          {canCreateLoan && (
+            <Link
+              href={`/back-office/loans/new?memberId=${member.id}`}
+              className="text-sm text-primary hover:underline"
+            >
+              + สร้างคำขอกู้ใหม่
+            </Link>
+          )}
         </div>
         <div className="mt-3 flex flex-col gap-2">
           {member.loanContracts.map((loan) => (
@@ -124,7 +140,7 @@ export default async function MemberDetailPage({
               className="flex items-center justify-between rounded-md bg-surface-2 px-4 py-2.5 text-sm hover:bg-primary-soft"
             >
               <span>
-                {loan.type} · {formatBaht(loan.principalMinor)}
+                {LOAN_TYPE_LABEL[loan.type] ?? loan.type} · {formatBaht(loan.principalMinor)}
               </span>
               <span className="text-xs text-muted">
                 {LOAN_STATUS_LABEL[loan.status] ?? loan.status}

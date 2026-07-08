@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatBaht } from "@/lib/money";
+import { getSession, LOAN_ROLES } from "@/lib/session";
 
 const LOAN_TYPE_LABEL: Record<string, string> = {
   EMERGENCY: "เงินกู้ฉุกเฉิน",
@@ -27,6 +28,9 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export default async function LoansPage() {
+  const session = await getSession();
+  const canCreateLoan = !!session && LOAN_ROLES.includes(session.role);
+
   const loans = await prisma.loanContract.findMany({
     orderBy: { createdAt: "desc" },
     include: { member: true },
@@ -41,12 +45,14 @@ export default async function LoansPage() {
             ทั้งหมด {loans.length.toLocaleString("th-TH")} รายการ
           </p>
         </div>
-        <Link
-          href="/back-office/loans/new"
-          className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
-        >
-          + สร้างคำขอกู้ใหม่
-        </Link>
+        {canCreateLoan && (
+          <Link
+            href="/back-office/loans/new"
+            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+          >
+            + สร้างคำขอกู้ใหม่
+          </Link>
+        )}
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-line bg-surface">

@@ -2,17 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireRole, FINANCE_ROLES, MANAGER_ADMIN_ROLES } from "@/lib/session";
 import { parseBahtInput } from "@/lib/money";
 import type { ActionState } from "@/lib/actions/members";
-
-const FINANCE_ROLES = ["STAFF_FINANCE", "MANAGER", "ADMIN"] as const;
 
 export async function depositAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const session = await requireRole([...FINANCE_ROLES]);
+  const session = await requireRole(FINANCE_ROLES);
   const savingsAccountId = String(formData.get("savingsAccountId") ?? "");
   const memberId = String(formData.get("memberId") ?? "");
   const note = String(formData.get("note") ?? "").trim() || null;
@@ -67,7 +65,7 @@ export async function withdrawAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const session = await requireRole([...FINANCE_ROLES]);
+  const session = await requireRole(FINANCE_ROLES);
   const savingsAccountId = String(formData.get("savingsAccountId") ?? "");
   const memberId = String(formData.get("memberId") ?? "");
   const note = String(formData.get("note") ?? "").trim() || null;
@@ -79,17 +77,17 @@ export async function withdrawAction(
     return { error: "จำนวนเงินถอนไม่ถูกต้อง" };
   }
 
-  const account = await prisma.savingsAccount.findUnique({
-    where: { id: savingsAccountId },
-  });
-  if (!account || account.memberId !== memberId) {
-    return { error: "ไม่พบบัญชีเงินฝากนี้" };
-  }
-  if (account.balanceMinor < amountMinor) {
-    return { error: "ยอดเงินคงเหลือไม่เพียงพอ" };
-  }
+  const result = await prisma.$transaction(async (tx) => {
+    const account = await tx.savingsAccount.findUnique({
+      where: { id: savingsAccountId },
+    });
+    if (!account || account.memberId !== memberId) {
+      return { error: "ไม่พบบัญชีเงินฝากนี้" } satisfies ActionState;
+    }
+    if (account.balanceMinor < amountMinor) {
+      return { error: "ยอดเงินคงเหลือไม่เพียงพอ" } satisfies ActionState;
+    }
 
-  await prisma.$transaction(async (tx) => {
     await tx.savingsAccount.update({
       where: { id: savingsAccountId },
       data: { balanceMinor: { decrement: amountMinor } },
@@ -115,7 +113,11 @@ export async function withdrawAction(
         after: JSON.stringify({ savingsAccountId, amountMinor }),
       },
     });
+
+    return null;
   });
+
+  if (result) return result;
 
   revalidatePath(`/back-office/members/${memberId}`);
   return { success: "บันทึกการถอนเงินเรียบร้อยแล้ว" };
@@ -125,24 +127,27 @@ export async function runInterestAccrualAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const session = await requireRole(["MANAGER", "ADMIN"]);
+  const session = await requireRole(MANAGER_ADMIN_ROLES);
   const period = String(formData.get("period") ?? "").trim(); // "YYYY-MM"
   if (!/^\d{4}-\d{2}$/.test(period)) {
     return { error: "รูปแบบงวดไม่ถูกต้อง (ต้องเป็น YYYY-MM)" };
   }
 
   const marker = `INTEREST:${period}`;
-  const already = await prisma.transaction.findFirst({
-    where: { type: "INTEREST_ACCRUAL", note: marker },
-  });
-  if (already) {
-    return { error: `ประมวลผลดอกเบี้ยงวด ${period} ไปแล้ว ไม่สามารถทำซ้ำได้` };
-  }
 
-  const accounts = await prisma.savingsAccount.findMany();
-  let count = 0;
+  const result = await prisma.$transaction(async (tx) => {
+    const already = await tx.transaction.findFirst({
+      where: { type: "INTEREST_ACCRUAL", note: marker },
+    });
+    if (already) {
+      return {
+        error: `ประมวลผลดอกเบี้ยงวด ${period} ไปแล้ว ไม่สามารถทำซ้ำได้`,
+      } satisfies ActionState;
+    }
 
-  await prisma.$transaction(async (tx) => {
+    const accounts = await tx.savingsAccount.findMany();
+    let count = 0;
+
     for (const account of accounts) {
       const monthlyInterest = Math.round(
         (account.balanceMinor * account.interestRateBps) / 10000 / 12
@@ -176,8 +181,14 @@ export async function runInterestAccrualAction(
         after: JSON.stringify({ accountsCredited: count }),
       },
     });
+
+    return { count } as const;
   });
 
+  if ("error" in result) return result;
+
   revalidatePath("/back-office");
-  return { success: `ประมวลผลดอกเบี้ยงวด ${period} เรียบร้อย (${count} บัญชี)` };
+  return {
+    success: `ประมวลผลดอกเบี้ยงวด ${period} เรียบร้อย (${result.count} บัญชี)`,
+  };
 }

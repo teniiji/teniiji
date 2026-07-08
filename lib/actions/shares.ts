@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireRole, FINANCE_ROLES } from "@/lib/session";
 import { parseBahtInput } from "@/lib/money";
 import type { ActionState } from "@/lib/actions/members";
 
@@ -10,7 +10,7 @@ export async function recordShareContributionAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const session = await requireRole(["STAFF_FINANCE", "MANAGER", "ADMIN"]);
+  const session = await requireRole(FINANCE_ROLES);
   const shareAccountId = String(formData.get("shareAccountId") ?? "");
   const memberId = String(formData.get("memberId") ?? "");
 

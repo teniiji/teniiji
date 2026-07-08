@@ -3,7 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import {
+  requireRole,
+  LOAN_ROLES,
+  FINANCE_ROLES,
+  FINANCE_ADMIN_ROLES,
+  MANAGER_ADMIN_ROLES,
+} from "@/lib/session";
 import { parseBahtInput } from "@/lib/money";
 import { buildAmortizationSchedule } from "@/lib/loan-schedule";
 import { notifyMember } from "@/lib/notify";
@@ -39,7 +45,7 @@ export async function createLoanContractAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const session = await requireRole(["STAFF_LOAN", "MANAGER", "ADMIN"]);
+  const session = await requireRole(LOAN_ROLES);
   const memberId = String(formData.get("memberId") ?? "");
 
   let parsed: ReturnType<typeof parseLoanForm>;
@@ -52,18 +58,30 @@ export async function createLoanContractAction(
   const guarantorMemberCode = String(
     formData.get("guarantorMemberCode") ?? ""
   ).trim();
-  const guaranteedAmount = formData.get("guaranteedAmount");
+  const rawGuaranteedAmount = String(formData.get("guaranteedAmount") ?? "").trim();
 
   const member = await prisma.member.findUnique({ where: { id: memberId } });
   if (!member) return { error: "ไม่พบสมาชิกนี้" };
 
   let guarantor = null;
+  let guaranteedAmountMinor = parsed.principalMinor;
   if (guarantorMemberCode) {
     guarantor = await prisma.member.findUnique({
       where: { memberCode: guarantorMemberCode },
     });
     if (!guarantor) {
       return { error: "ไม่พบรหัสสมาชิกผู้ค้ำประกัน" };
+    }
+    if (guarantor.id === memberId) {
+      return { error: "สมาชิกไม่สามารถค้ำประกันเงินกู้ของตนเองได้" };
+    }
+    // "0" หรือค่าว่างถือว่าไม่ได้ระบุ ใช้วงเงินกู้เต็มจำนวนเป็นค่าเริ่มต้น
+    if (rawGuaranteedAmount && Number(rawGuaranteedAmount) > 0) {
+      try {
+        guaranteedAmountMinor = parseBahtInput(rawGuaranteedAmount);
+      } catch {
+        return { error: "วงเงินค้ำประกันไม่ถูกต้อง" };
+      }
     }
   }
 
@@ -81,9 +99,7 @@ export async function createLoanContractAction(
         data: {
           loanContractId: created.id,
           memberId: guarantor.id,
-          guaranteedAmountMinor: guaranteedAmount
-            ? parseBahtInput(guaranteedAmount)
-            : parsed.principalMinor,
+          guaranteedAmountMinor,
         },
       });
     }
@@ -139,7 +155,7 @@ export async function approveLoanAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const session = await requireRole(["MANAGER", "ADMIN"]);
+  const session = await requireRole(MANAGER_ADMIN_ROLES);
   const loanContractId = String(formData.get("loanContractId") ?? "");
 
   const loan = await prisma.loanContract.findUnique({
@@ -178,7 +194,7 @@ export async function rejectLoanAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const session = await requireRole(["STAFF_LOAN", "MANAGER", "ADMIN"]);
+  const session = await requireRole(LOAN_ROLES);
   const loanContractId = String(formData.get("loanContractId") ?? "");
 
   const loan = await prisma.loanContract.findUnique({
@@ -218,7 +234,7 @@ export async function disburseLoanAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const session = await requireRole(["STAFF_FINANCE", "ADMIN"]);
+  const session = await requireRole(FINANCE_ADMIN_ROLES);
   const loanContractId = String(formData.get("loanContractId") ?? "");
 
   const loan = await prisma.loanContract.findUnique({
@@ -300,7 +316,7 @@ export async function recordLoanPaymentAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const session = await requireRole(["STAFF_FINANCE", "MANAGER", "ADMIN"]);
+  const session = await requireRole(FINANCE_ROLES);
   const loanInstallmentId = String(formData.get("loanInstallmentId") ?? "");
 
   let amountMinor: number;
@@ -310,24 +326,26 @@ export async function recordLoanPaymentAction(
     return { error: "จำนวนเงินชำระไม่ถูกต้อง" };
   }
 
-  const installment = await prisma.loanInstallment.findUnique({
-    where: { id: loanInstallmentId },
-    include: { loanContract: true },
-  });
-  if (!installment) return { error: "ไม่พบงวดชำระนี้" };
-  if (installment.status === "PAID") {
-    return { error: "งวดนี้ชำระครบแล้ว" };
-  }
+  // อ่านสถานะงวดล่าสุด "ภายใน" transaction เดียวกับที่เขียน (ไม่ใช่ก่อนหน้า) และใช้ increment
+  // แทนการคำนวณยอดใหม่จากค่าที่อ่านมาก่อน — กันปัญหา lost update เมื่อมีการบันทึกชำระพร้อมกัน
+  const result = await prisma.$transaction(async (tx) => {
+    const installment = await tx.loanInstallment.findUnique({
+      where: { id: loanInstallmentId },
+      include: { loanContract: true },
+    });
+    if (!installment) return { error: "ไม่พบงวดชำระนี้" } satisfies ActionState;
+    if (installment.status === "PAID") {
+      return { error: "งวดนี้ชำระครบแล้ว" } satisfies ActionState;
+    }
 
-  const newPaid = installment.paidMinor + amountMinor;
-  const totalDue = installment.principalDueMinor + installment.interestDueMinor;
-  const status = newPaid >= totalDue ? "PAID" : "PARTIAL";
+    const newPaid = installment.paidMinor + amountMinor;
+    const totalDue = installment.principalDueMinor + installment.interestDueMinor;
+    const status = newPaid >= totalDue ? "PAID" : "PARTIAL";
 
-  await prisma.$transaction(async (tx) => {
     await tx.loanInstallment.update({
       where: { id: loanInstallmentId },
       data: {
-        paidMinor: newPaid,
+        paidMinor: { increment: amountMinor },
         status,
         paidAt: status === "PAID" ? new Date() : installment.paidAt,
       },
@@ -364,8 +382,12 @@ export async function recordLoanPaymentAction(
         after: JSON.stringify({ loanInstallmentId, amountMinor }),
       },
     });
+
+    return { loanContractId: installment.loanContractId };
   });
 
-  revalidatePath(`/back-office/loans/${installment.loanContractId}`);
+  if ("error" in result) return result;
+
+  revalidatePath(`/back-office/loans/${result.loanContractId}`);
   return { success: "บันทึกการชำระงวดเรียบร้อยแล้ว" };
 }

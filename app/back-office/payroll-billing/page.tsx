@@ -1,9 +1,13 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatBaht } from "@/lib/money";
+import { getSession, FINANCE_ROLES } from "@/lib/session";
 import { GenerateBillingForm } from "./generate-billing-form";
 
 export default async function PayrollBillingPage() {
+  const session = await getSession();
+  const canGenerateBilling = !!session && FINANCE_ROLES.includes(session.role);
+
   const runs = await prisma.payrollBillingRun.findMany({
     orderBy: { period: "desc" },
     include: {
@@ -21,7 +25,7 @@ export default async function PayrollBillingPage() {
         </p>
       </div>
 
-      <GenerateBillingForm />
+      {canGenerateBilling && <GenerateBillingForm />}
 
       <div className="overflow-x-auto rounded-lg border border-line bg-surface">
         <table className="w-full text-sm">

@@ -80,3 +80,13 @@ export const STAFF_ROLES: UserRole[] = [
   "MANAGER",
   "ADMIN",
 ];
+
+/**
+ * ชุดสิทธิ์ที่ใช้ร่วมกันระหว่าง server action (requireRole) และหน้าจอที่ซ่อน/แสดงฟอร์ม
+ * ต้องใช้ค่าเดียวกันทั้งสองฝั่งเสมอ — ถ้าซ่อนปุ่มด้วยเงื่อนไขคนละชุดกับที่ action อนุญาต
+ * ผู้ใช้ที่เห็นปุ่มแต่ action ปฏิเสธจะเจอ error ที่ไม่ได้ถูก catch (requireRole throw ตรงๆ)
+ */
+export const FINANCE_ROLES: UserRole[] = ["STAFF_FINANCE", "MANAGER", "ADMIN"];
+export const LOAN_ROLES: UserRole[] = ["STAFF_LOAN", "MANAGER", "ADMIN"];
+export const FINANCE_ADMIN_ROLES: UserRole[] = ["STAFF_FINANCE", "ADMIN"];
+export const MANAGER_ADMIN_ROLES: UserRole[] = ["MANAGER", "ADMIN"];

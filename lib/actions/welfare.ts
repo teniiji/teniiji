@@ -2,7 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import {
+  requireRole,
+  STAFF_ROLES,
+  FINANCE_ADMIN_ROLES,
+  MANAGER_ADMIN_ROLES,
+} from "@/lib/session";
 import { parseBahtInput, formatBaht } from "@/lib/money";
 import { notifyMember } from "@/lib/notify";
 import type { ActionState } from "@/lib/actions/members";
@@ -50,7 +55,7 @@ export async function createWelfareFundAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  await requireRole(["MANAGER", "ADMIN"]);
+  await requireRole(MANAGER_ADMIN_ROLES);
 
   const type = String(formData.get("type") ?? "FUNERAL") as
     | "FUNERAL"
@@ -85,7 +90,7 @@ export async function createWelfareClaimAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  await requireRole(["STAFF_FINANCE", "STAFF_LOAN", "MANAGER", "ADMIN"]);
+  await requireRole(STAFF_ROLES);
 
   const memberId = String(formData.get("memberId") ?? "");
   const welfareFundId = String(formData.get("welfareFundId") ?? "");
@@ -151,7 +156,7 @@ export async function decideWelfareClaimAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const session = await requireRole(["MANAGER", "ADMIN"]);
+  const session = await requireRole(MANAGER_ADMIN_ROLES);
   const welfareClaimId = String(formData.get("welfareClaimId") ?? "");
   const decision = String(formData.get("decision") ?? "");
   const rejectionReason = String(formData.get("rejectionReason") ?? "").trim() || null;
@@ -159,16 +164,16 @@ export async function decideWelfareClaimAction(
   if (decision !== "APPROVE" && decision !== "REJECT") {
     return { error: "การตัดสินใจไม่ถูกต้อง" };
   }
-
-  const claim = await prisma.welfareClaim.findUnique({ where: { id: welfareClaimId } });
-  if (!claim || claim.status !== "SUBMITTED") {
-    return { error: "คำขอนี้ไม่อยู่ในสถานะที่พิจารณาได้" };
-  }
   if (decision === "REJECT" && !rejectionReason) {
     return { error: "กรุณาระบุเหตุผลการปฏิเสธ" };
   }
 
-  await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
+    const claim = await tx.welfareClaim.findUnique({ where: { id: welfareClaimId } });
+    if (!claim || claim.status !== "SUBMITTED") {
+      return { error: "คำขอนี้ไม่อยู่ในสถานะที่พิจารณาได้" } satisfies ActionState;
+    }
+
     await tx.welfareClaim.update({
       where: { id: welfareClaimId },
       data: {
@@ -186,7 +191,12 @@ export async function decideWelfareClaimAction(
         entityId: welfareClaimId,
       },
     });
+
+    return { memberId: claim.memberId };
   });
+
+  if ("error" in result) return result;
+  const claim = result;
 
   await notifyMember({
     memberId: claim.memberId,
@@ -208,22 +218,22 @@ export async function payWelfareClaimAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const session = await requireRole(["STAFF_FINANCE", "ADMIN"]);
+  const session = await requireRole(FINANCE_ADMIN_ROLES);
   const welfareClaimId = String(formData.get("welfareClaimId") ?? "");
 
-  const claim = await prisma.welfareClaim.findUnique({ where: { id: welfareClaimId } });
-  if (!claim || claim.status !== "APPROVED") {
-    return { error: "คำขอนี้ไม่อยู่ในสถานะที่จ่ายเงินได้" };
-  }
+  const result = await prisma.$transaction(async (tx) => {
+    const claim = await tx.welfareClaim.findUnique({ where: { id: welfareClaimId } });
+    if (!claim || claim.status !== "APPROVED") {
+      return { error: "คำขอนี้ไม่อยู่ในสถานะที่จ่ายเงินได้" } satisfies ActionState;
+    }
 
-  const savingsAccount = await prisma.savingsAccount.findFirst({
-    where: { memberId: claim.memberId, type: "SAVINGS" },
-  });
-  if (!savingsAccount) {
-    return { error: "สมาชิกยังไม่มีบัญชีเงินฝากออมทรัพย์สำหรับรับเงินสวัสดิการ" };
-  }
+    const savingsAccount = await tx.savingsAccount.findFirst({
+      where: { memberId: claim.memberId, type: "SAVINGS" },
+    });
+    if (!savingsAccount) {
+      return { error: "สมาชิกยังไม่มีบัญชีเงินฝากออมทรัพย์สำหรับรับเงินสวัสดิการ" } satisfies ActionState;
+    }
 
-  await prisma.$transaction(async (tx) => {
     await tx.welfareClaim.update({
       where: { id: welfareClaimId },
       data: { status: "PAID", paidAt: new Date() },
@@ -254,12 +264,16 @@ export async function payWelfareClaimAction(
         after: JSON.stringify({ welfareClaimId, amountMinor: claim.requestedAmountMinor }),
       },
     });
+
+    return { memberId: claim.memberId, amountMinor: claim.requestedAmountMinor };
   });
 
+  if ("error" in result) return result;
+
   await notifyMember({
-    memberId: claim.memberId,
+    memberId: result.memberId,
     title: "จ่ายเงินสวัสดิการเรียบร้อยแล้ว",
-    body: `เงินสวัสดิการจำนวน ${formatBaht(claim.requestedAmountMinor)} ได้เข้าบัญชีเงินฝากออมทรัพย์ของท่านแล้ว`,
+    body: `เงินสวัสดิการจำนวน ${formatBaht(result.amountMinor)} ได้เข้าบัญชีเงินฝากออมทรัพย์ของท่านแล้ว`,
   });
 
   revalidatePath(`/back-office/welfare/claims/${welfareClaimId}`);

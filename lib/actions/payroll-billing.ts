@@ -2,12 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireRole, FINANCE_ROLES } from "@/lib/session";
 import { notifyMember } from "@/lib/notify";
 import { formatBaht } from "@/lib/money";
 import type { ActionState } from "@/lib/actions/members";
-
-const BILLING_ROLES = ["STAFF_FINANCE", "MANAGER", "ADMIN"] as const;
 
 function parsePeriod(period: string) {
   if (!/^\d{4}-\d{2}$/.test(period)) {
@@ -28,7 +26,7 @@ export async function generateMonthlyBillingAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const session = await requireRole([...BILLING_ROLES]);
+  const session = await requireRole(FINANCE_ROLES);
   const period = String(formData.get("period") ?? "").trim();
 
   let monthStart: Date;
@@ -114,13 +112,15 @@ export async function generateMonthlyBillingAction(
   });
 
   // แจ้งยอดหักเงินเดือนประจำเดือนให้สมาชิกแต่ละคนที่อยู่ในรายการทราบ
-  for (const item of items) {
-    await notifyMember({
-      memberId: item.memberId,
-      title: `แจ้งยอดหักเงินเดือนงวด ${period}`,
-      body: `หุ้น ${formatBaht(item.shareDueMinor)} + เงินฝากภาคบังคับ ${formatBaht(item.savingsDueMinor)} + งวดเงินกู้ ${formatBaht(item.loanDueMinor)} รวม ${formatBaht(item.totalDueMinor)} จะถูกส่งให้ต้นสังกัดหักผ่านเงินเดือน`,
-    });
-  }
+  await Promise.all(
+    items.map((item) =>
+      notifyMember({
+        memberId: item.memberId,
+        title: `แจ้งยอดหักเงินเดือนงวด ${period}`,
+        body: `หุ้น ${formatBaht(item.shareDueMinor)} + เงินฝากภาคบังคับ ${formatBaht(item.savingsDueMinor)} + งวดเงินกู้ ${formatBaht(item.loanDueMinor)} รวม ${formatBaht(item.totalDueMinor)} จะถูกส่งให้ต้นสังกัดหักผ่านเงินเดือน`,
+      })
+    )
+  );
 
   redirect(`/back-office/payroll-billing/${run.id}`);
 }
