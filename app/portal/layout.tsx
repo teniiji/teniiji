@@ -36,6 +36,9 @@ export default async function PortalLayout({
             <Link href="/portal/loans/apply" className="rounded-md px-3 py-1.5 hover:bg-surface-2">
               ยื่นกู้
             </Link>
+            <Link href="/portal/welfare" className="rounded-md px-3 py-1.5 hover:bg-surface-2">
+              สวัสดิการ
+            </Link>
           </nav>
           <form action={logoutAction}>
             <button

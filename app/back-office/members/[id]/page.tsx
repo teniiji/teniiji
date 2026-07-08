@@ -26,6 +26,7 @@ const TXN_TYPE_LABEL: Record<string, string> = {
   LOAN_DISBURSEMENT: "เบิกจ่ายเงินกู้",
   LOAN_PAYMENT: "ชำระเงินกู้",
   INTEREST_ACCRUAL: "ดอกเบี้ยเงินฝาก",
+  WELFARE_PAYOUT: "จ่ายเงินสวัสดิการ",
 };
 
 export default async function MemberDetailPage({

@@ -64,6 +64,20 @@ enum TransactionType {
   LOAN_DISBURSEMENT
   LOAN_PAYMENT
   INTEREST_ACCRUAL
+  WELFARE_PAYOUT
+}
+
+enum WelfareFundType {
+  FUNERAL
+  EDUCATION
+  MEDICAL
+}
+
+enum WelfareClaimStatus {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  PAID
 }
 
 model Member {
@@ -83,6 +97,7 @@ model Member {
   guarantorFor     LoanGuarantor[]
   transactions     Transaction[]
   deductionRecords PayrollDeductionRecord[]
+  welfareClaims    WelfareClaim[]
 }
 
 model User {
@@ -95,9 +110,10 @@ model User {
   memberId String? @unique
   member   Member? @relation(fields: [memberId], references: [id])
 
-  createdTransactions Transaction[]
-  auditLogs           AuditLog[]
-  billingRuns         PayrollBillingRun[]
+  createdTransactions  Transaction[]
+  auditLogs            AuditLog[]
+  billingRuns          PayrollBillingRun[]
+  decidedWelfareClaims WelfareClaim[]
 }
 
 model SavingsAccount {
@@ -201,6 +217,9 @@ model Transaction {
   loanInstallmentId String?
   loanInstallment   LoanInstallment? @relation(fields: [loanInstallmentId], references: [id])
 
+  welfareClaimId String?
+  welfareClaim   WelfareClaim? @relation(fields: [welfareClaimId], references: [id])
+
   createdByUserId String
   createdByUser   User   @relation(fields: [createdByUserId], references: [id])
 }
@@ -248,4 +267,40 @@ model PayrollDeductionRecord {
   member   Member @relation(fields: [memberId], references: [id])
 
   @@unique([billingRunId, memberId])
+}
+
+// สวัสดิการและเงินสงเคราะห์: กองทุน (ฌกส./ทุนการศึกษา/รักษาพยาบาล) และคำขอรับสิทธิ์ของสมาชิก
+model WelfareFund {
+  id                  String          @id @default(cuid())
+  type                WelfareFundType
+  name                String
+  description         String?
+  benefitAmountMinor  Int
+  minMembershipMonths Int             @default(0) // อายุสมาชิกภาพขั้นต่ำ (เดือน) ที่มีสิทธิ์
+  active              Boolean         @default(true)
+  createdAt           DateTime        @default(now())
+
+  claims WelfareClaim[]
+}
+
+model WelfareClaim {
+  id                   String             @id @default(cuid())
+  reason               String
+  requestedAmountMinor Int
+  status               WelfareClaimStatus @default(SUBMITTED)
+  submittedAt          DateTime           @default(now())
+  decidedAt            DateTime?
+  rejectionReason      String?
+  paidAt               DateTime?
+
+  welfareFundId String
+  welfareFund   WelfareFund @relation(fields: [welfareFundId], references: [id])
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id])
+
+  decidedByUserId String?
+  decidedByUser   User?   @relation(fields: [decidedByUserId], references: [id])
+
+  transactions Transaction[]
 }

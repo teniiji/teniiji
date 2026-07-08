@@ -12,6 +12,9 @@ const ACTION_LABEL: Record<string, string> = {
   RECORD_LOAN_PAYMENT: "บันทึกชำระเงินกู้",
   RUN_INTEREST_ACCRUAL: "ประมวลผลดอกเบี้ย",
   GENERATE_MONTHLY_BILLING: "สร้างรายการเรียกเก็บรายเดือน",
+  APPROVE_WELFARE_CLAIM: "อนุมัติคำขอสวัสดิการ",
+  REJECT_WELFARE_CLAIM: "ปฏิเสธคำขอสวัสดิการ",
+  PAY_WELFARE_CLAIM: "จ่ายเงินสวัสดิการ",
 };
 
 export default async function AuditLogPage() {

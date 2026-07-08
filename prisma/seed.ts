@@ -10,6 +10,10 @@ async function main() {
   // ลบข้อมูลเดิมทั้งหมด (เรียงตามลำดับ dependency) เพื่อให้ seed ซ้ำได้
   await prisma.auditLog.deleteMany();
   await prisma.transaction.deleteMany();
+  await prisma.payrollDeductionRecord.deleteMany();
+  await prisma.payrollBillingRun.deleteMany();
+  await prisma.welfareClaim.deleteMany();
+  await prisma.welfareFund.deleteMany();
   await prisma.loanInstallment.deleteMany();
   await prisma.loanGuarantor.deleteMany();
   await prisma.loanContract.deleteMany();
@@ -202,6 +206,42 @@ async function main() {
       entityType: "Member",
       entityId: somchai.id,
       after: JSON.stringify({ memberCode: somchai.memberCode }),
+    },
+  });
+
+  // กองทุนสวัสดิการตัวอย่าง
+  const funeralFund = await prisma.welfareFund.create({
+    data: {
+      type: "FUNERAL",
+      name: "เงินสงเคราะห์ศพสมาชิก ประจำปี 2569",
+      benefitAmountMinor: bahtToMinor(20000),
+      minMembershipMonths: 0,
+    },
+  });
+  await prisma.welfareFund.create({
+    data: {
+      type: "EDUCATION",
+      name: "ทุนการศึกษาบุตรสมาชิก ประจำปี 2569",
+      benefitAmountMinor: bahtToMinor(3000),
+      minMembershipMonths: 12,
+    },
+  });
+  await prisma.welfareFund.create({
+    data: {
+      type: "MEDICAL",
+      name: "สวัสดิการรักษาพยาบาลสมาชิก",
+      benefitAmountMinor: bahtToMinor(5000),
+      minMembershipMonths: 6,
+    },
+  });
+
+  // คำขอสวัสดิการตัวอย่าง: ครูวิชัยยื่นขอเงินสงเคราะห์ศพ (รอพิจารณา — สาธิต flow อนุมัติ/ปฏิเสธ/จ่ายเงิน)
+  await prisma.welfareClaim.create({
+    data: {
+      memberId: wichai.id,
+      welfareFundId: funeralFund.id,
+      reason: "บิดาเสียชีวิต ขอรับเงินสงเคราะห์ตามระเบียบสหกรณ์",
+      requestedAmountMinor: funeralFund.benefitAmountMinor,
     },
   });
 
