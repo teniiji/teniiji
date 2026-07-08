@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { parseBahtInput } from "@/lib/money";
+import { parseBahtInput, formatBaht } from "@/lib/money";
+import { notifyMember } from "@/lib/notify";
 import type { ActionState } from "@/lib/actions/members";
 
 function monthsBetween(from: Date, to: Date): number {
@@ -187,6 +188,16 @@ export async function decideWelfareClaimAction(
     });
   });
 
+  await notifyMember({
+    memberId: claim.memberId,
+    title:
+      decision === "APPROVE" ? "คำขอสวัสดิการได้รับการอนุมัติ" : "คำขอสวัสดิการไม่ได้รับการอนุมัติ",
+    body:
+      decision === "APPROVE"
+        ? "คำขอรับสวัสดิการของท่านได้รับการอนุมัติแล้ว รอเจ้าหน้าที่การเงินจ่ายเงินเข้าบัญชีเงินฝากของท่าน"
+        : `คำขอรับสวัสดิการของท่านไม่ได้รับการอนุมัติ เหตุผล: ${rejectionReason}`,
+  });
+
   revalidatePath(`/back-office/welfare/claims/${welfareClaimId}`);
   return {
     success: decision === "APPROVE" ? "อนุมัติคำขอสวัสดิการเรียบร้อยแล้ว" : "ปฏิเสธคำขอสวัสดิการแล้ว",
@@ -243,6 +254,12 @@ export async function payWelfareClaimAction(
         after: JSON.stringify({ welfareClaimId, amountMinor: claim.requestedAmountMinor }),
       },
     });
+  });
+
+  await notifyMember({
+    memberId: claim.memberId,
+    title: "จ่ายเงินสวัสดิการเรียบร้อยแล้ว",
+    body: `เงินสวัสดิการจำนวน ${formatBaht(claim.requestedAmountMinor)} ได้เข้าบัญชีเงินฝากออมทรัพย์ของท่านแล้ว`,
   });
 
   revalidatePath(`/back-office/welfare/claims/${welfareClaimId}`);

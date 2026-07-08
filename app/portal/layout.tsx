@@ -39,6 +39,9 @@ export default async function PortalLayout({
             <Link href="/portal/welfare" className="rounded-md px-3 py-1.5 hover:bg-surface-2">
               สวัสดิการ
             </Link>
+            <Link href="/portal/notifications" className="rounded-md px-3 py-1.5 hover:bg-surface-2">
+              แจ้งเตือน
+            </Link>
           </nav>
           <form action={logoutAction}>
             <button

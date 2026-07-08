@@ -80,6 +80,19 @@ enum WelfareClaimStatus {
   PAID
 }
 
+enum NotificationChannel {
+  IN_APP
+  LINE
+  SMS
+  EMAIL
+}
+
+enum NotificationStatus {
+  SENT
+  PENDING
+  FAILED
+}
+
 model Member {
   id          String       @id @default(cuid())
   memberCode  String       @unique
@@ -98,6 +111,7 @@ model Member {
   transactions     Transaction[]
   deductionRecords PayrollDeductionRecord[]
   welfareClaims    WelfareClaim[]
+  notifications    Notification[]
 }
 
 model User {
@@ -114,6 +128,7 @@ model User {
   auditLogs            AuditLog[]
   billingRuns          PayrollBillingRun[]
   decidedWelfareClaims WelfareClaim[]
+  sentNotifications    Notification[]
 }
 
 model SavingsAccount {
@@ -303,4 +318,21 @@ model WelfareClaim {
   decidedByUser   User?   @relation(fields: [decidedByUserId], references: [id])
 
   transactions Transaction[]
+}
+
+// แจ้งเตือน/สื่อสารกับสมาชิก: ช่องทางหลักคือ LINE OA/LIFF (ยังไม่ได้เชื่อมต่อ credential จริงใน MVP นี้
+// จึงถือเป็น stub — สร้างระเบียนไว้พร้อมสถานะ PENDING) ส่วน IN_APP (กล่องข้อความในพอร์ทัลสมาชิก) ใช้งานได้จริงทันที
+model Notification {
+  id        String              @id @default(cuid())
+  title     String
+  body      String
+  channel   NotificationChannel @default(IN_APP)
+  status    NotificationStatus  @default(SENT)
+  createdAt DateTime            @default(now())
+
+  memberId String? // null = ประกาศทั่วไปถึงสมาชิกทุกคน
+  member   Member? @relation(fields: [memberId], references: [id])
+
+  createdByUserId String? // null = ระบบสร้างอัตโนมัติจากเหตุการณ์ทางธุรกิจ
+  createdByUser   User?   @relation(fields: [createdByUserId], references: [id])
 }

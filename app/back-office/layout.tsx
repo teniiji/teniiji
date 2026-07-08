@@ -47,6 +47,9 @@ export default async function BackOfficeLayout({
             <Link href="/back-office/payroll-billing" className="rounded-md px-3 py-1.5 hover:bg-surface-2">
               เรียกเก็บรายเดือน
             </Link>
+            <Link href="/back-office/notifications" className="rounded-md px-3 py-1.5 hover:bg-surface-2">
+              แจ้งเตือน
+            </Link>
             {(session.role === "MANAGER" || session.role === "ADMIN") && (
               <Link href="/back-office/reports" className="rounded-md px-3 py-1.5 hover:bg-surface-2">
                 รายงาน

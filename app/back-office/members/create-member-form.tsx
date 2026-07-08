@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { createMemberAction } from "@/lib/actions/members";
 import type { ActionState } from "@/lib/actions/members";
@@ -23,9 +23,14 @@ export function CreateMemberForm() {
     createMemberAction,
     {}
   );
+  const [open, setOpen] = useState(false);
 
   return (
-    <details className="rounded-lg border border-line bg-surface p-5">
+    <details
+      open={open}
+      onToggle={(e) => setOpen(e.currentTarget.open)}
+      className="rounded-lg border border-line bg-surface p-5"
+    >
       <summary className="cursor-pointer text-sm font-bold text-ink">
         + เพิ่มสมาชิกใหม่
       </summary>

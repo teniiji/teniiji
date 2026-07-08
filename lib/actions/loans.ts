@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { parseBahtInput } from "@/lib/money";
 import { buildAmortizationSchedule } from "@/lib/loan-schedule";
+import { notifyMember } from "@/lib/notify";
 import type { ActionState } from "@/lib/actions/members";
 import type { LoanType } from "@/generated/prisma/enums";
 
@@ -163,6 +164,12 @@ export async function approveLoanAction(
     });
   });
 
+  await notifyMember({
+    memberId: loan.memberId,
+    title: "คำขอกู้ได้รับการอนุมัติแล้ว",
+    body: "คำขอเงินกู้ของท่านได้รับการอนุมัติแล้ว รอเจ้าหน้าที่การเงินเบิกจ่ายเงินเข้าบัญชีเงินฝากของท่าน",
+  });
+
   revalidatePath(`/back-office/loans/${loanContractId}`);
   return { success: "อนุมัติเงินกู้เรียบร้อยแล้ว" };
 }
@@ -194,6 +201,12 @@ export async function rejectLoanAction(
         entityId: loanContractId,
       },
     });
+  });
+
+  await notifyMember({
+    memberId: loan.memberId,
+    title: "คำขอกู้ไม่ได้รับการอนุมัติ",
+    body: "คำขอเงินกู้ของท่านไม่ได้รับการอนุมัติในครั้งนี้ กรุณาติดต่อเจ้าหน้าที่สินเชื่อหากต้องการรายละเอียดเพิ่มเติม",
   });
 
   revalidatePath(`/back-office/loans/${loanContractId}`);
@@ -271,6 +284,12 @@ export async function disburseLoanAction(
         after: JSON.stringify({ installments: schedule.length }),
       },
     });
+  });
+
+  await notifyMember({
+    memberId: loan.memberId,
+    title: "เบิกจ่ายเงินกู้เรียบร้อยแล้ว",
+    body: `เงินกู้จำนวน ${schedule.length} งวด ได้เข้าบัญชีเงินฝากออมทรัพย์ของท่านแล้ว งวดแรกครบกำหนดวันที่ ${schedule[0]?.dueDate.toLocaleDateString("th-TH")}`,
   });
 
   revalidatePath(`/back-office/loans/${loanContractId}`);
