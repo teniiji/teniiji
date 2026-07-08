@@ -93,6 +93,7 @@ async function main() {
         accountNumber: `SA-${member.memberCode}`,
         type: "SAVINGS",
         interestRateBps: 150,
+        mandatoryMonthlyMinor: bahtToMinor(200),
         balanceMinor: bahtToMinor(balance),
       },
     });

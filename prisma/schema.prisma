@@ -76,12 +76,13 @@ model Member {
   affiliation String
   createdAt   DateTime     @default(now())
 
-  user            User?
-  savingsAccounts SavingsAccount[]
-  shareAccount    ShareAccount?
-  loanContracts   LoanContract[]
-  guarantorFor    LoanGuarantor[]
-  transactions    Transaction[]
+  user             User?
+  savingsAccounts  SavingsAccount[]
+  shareAccount     ShareAccount?
+  loanContracts    LoanContract[]
+  guarantorFor     LoanGuarantor[]
+  transactions     Transaction[]
+  deductionRecords PayrollDeductionRecord[]
 }
 
 model User {
@@ -96,15 +97,17 @@ model User {
 
   createdTransactions Transaction[]
   auditLogs           AuditLog[]
+  billingRuns         PayrollBillingRun[]
 }
 
 model SavingsAccount {
-  id              String             @id @default(cuid())
-  accountNumber   String             @unique
-  type            SavingsAccountType
-  balanceMinor    Int                @default(0)
-  interestRateBps Int
-  openedAt        DateTime           @default(now())
+  id                    String             @id @default(cuid())
+  accountNumber         String             @unique
+  type                  SavingsAccountType
+  balanceMinor          Int                @default(0)
+  interestRateBps       Int
+  mandatoryMonthlyMinor Int                @default(0) // เงินฝากภาคบังคับที่ต้องเรียกเก็บทุกเดือน (0 = ไม่บังคับ)
+  openedAt              DateTime           @default(now())
 
   memberId String
   member   Member @relation(fields: [memberId], references: [id])
@@ -113,10 +116,10 @@ model SavingsAccount {
 }
 
 model ShareAccount {
-  id                        String   @id @default(cuid())
-  balanceMinor              Int      @default(0)
-  monthlyContributionMinor  Int
-  openedAt                  DateTime @default(now())
+  id                       String   @id @default(cuid())
+  balanceMinor             Int      @default(0)
+  monthlyContributionMinor Int
+  openedAt                 DateTime @default(now())
 
   memberId String @unique
   member   Member @relation(fields: [memberId], references: [id])
@@ -213,4 +216,36 @@ model AuditLog {
 
   actorUserId String
   actorUser   User   @relation(fields: [actorUserId], references: [id])
+}
+
+// เรียกเก็บรายเดือน: รายการยอดที่ขอหักเงินเดือนของสมาชิกแต่ละคน (หุ้น + เงินฝากภาคบังคับ + งวดเงินกู้)
+// ส่งให้ต้นสังกัดหักผ่านเงินเดือนทุกเดือน — actualDeductedMinor จะถูกเติมทีหลังโดยโมดูล
+// นำเข้า/กระทบยอด statement เมื่อทราบผลการหักจริง
+model PayrollBillingRun {
+  id          String   @id @default(cuid())
+  period      String   @unique // รูปแบบ "YYYY-MM"
+  generatedAt DateTime @default(now())
+
+  generatedByUserId String
+  generatedByUser   User   @relation(fields: [generatedByUserId], references: [id])
+
+  records PayrollDeductionRecord[]
+}
+
+model PayrollDeductionRecord {
+  id                  String   @id @default(cuid())
+  shareDueMinor       Int      @default(0)
+  savingsDueMinor     Int      @default(0)
+  loanDueMinor        Int      @default(0)
+  totalDueMinor       Int
+  actualDeductedMinor Int? // ยอดที่หักจริง (เติมทีหลังตอนกระทบยอด statement)
+  createdAt           DateTime @default(now())
+
+  billingRunId String
+  billingRun   PayrollBillingRun @relation(fields: [billingRunId], references: [id])
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id])
+
+  @@unique([billingRunId, memberId])
 }

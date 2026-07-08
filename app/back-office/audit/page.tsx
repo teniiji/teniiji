@@ -11,6 +11,7 @@ const ACTION_LABEL: Record<string, string> = {
   DISBURSE_LOAN: "เบิกจ่ายเงินกู้",
   RECORD_LOAN_PAYMENT: "บันทึกชำระเงินกู้",
   RUN_INTEREST_ACCRUAL: "ประมวลผลดอกเบี้ย",
+  GENERATE_MONTHLY_BILLING: "สร้างรายการเรียกเก็บรายเดือน",
 };
 
 export default async function AuditLogPage() {

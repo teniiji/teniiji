@@ -72,6 +72,12 @@ export default async function MemberDetailPage({
                   <p className="text-xs text-muted">
                     เลขบัญชี {acc.accountNumber} · ดอกเบี้ย{" "}
                     {(acc.interestRateBps / 100).toFixed(2)}% ต่อปี
+                    {acc.mandatoryMonthlyMinor > 0 && (
+                      <>
+                        {" "}
+                        · เงินฝากภาคบังคับ {formatBaht(acc.mandatoryMonthlyMinor)}/เดือน
+                      </>
+                    )}
                   </p>
                 </div>
                 <p className="text-lg font-bold text-primary-ink">

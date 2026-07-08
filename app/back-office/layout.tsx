@@ -41,6 +41,9 @@ export default async function BackOfficeLayout({
             <Link href="/back-office/loans" className="rounded-md px-3 py-1.5 hover:bg-surface-2">
               เงินกู้
             </Link>
+            <Link href="/back-office/payroll-billing" className="rounded-md px-3 py-1.5 hover:bg-surface-2">
+              เรียกเก็บรายเดือน
+            </Link>
             <Link href="/back-office/audit" className="rounded-md px-3 py-1.5 hover:bg-surface-2">
               Audit Log
             </Link>
