@@ -187,6 +187,54 @@ async function main() {
     },
   });
 
+  // เงินกู้พิเศษของครูสมหญิง: เบิกจ่ายไปแล้ว 2 เดือน มีงวดค้างชำระ (สาธิตรายงานหนี้ค้างชำระ)
+  const overdueDisbursedAt = new Date();
+  overdueDisbursedAt.setMonth(overdueDisbursedAt.getMonth() - 2);
+
+  const overdueLoan = await prisma.loanContract.create({
+    data: {
+      memberId: somyingMember.id,
+      type: "SPECIAL",
+      principalMinor: bahtToMinor(30000),
+      interestRateBps: 800,
+      termMonths: 12,
+      status: "DISBURSED",
+      approvedAt: overdueDisbursedAt,
+      disbursedAt: overdueDisbursedAt,
+    },
+  });
+  const overdueSchedule = buildAmortizationSchedule({
+    principalMinor: overdueLoan.principalMinor,
+    interestRateBps: overdueLoan.interestRateBps,
+    termMonths: overdueLoan.termMonths,
+    startDate: overdueDisbursedAt,
+  });
+  await Promise.all(
+    overdueSchedule.map((row) =>
+      prisma.loanInstallment.create({
+        data: {
+          loanContractId: overdueLoan.id,
+          installmentNo: row.installmentNo,
+          dueDate: row.dueDate,
+          principalDueMinor: row.principalDueMinor,
+          interestDueMinor: row.interestDueMinor,
+        },
+      })
+    )
+  );
+  await prisma.transaction.create({
+    data: {
+      type: "LOAN_DISBURSEMENT",
+      amountMinor: overdueLoan.principalMinor,
+      memberId: somyingMember.id,
+      savingsAccountId: savingsAccounts[somyingMember.id].id,
+      loanContractId: overdueLoan.id,
+      createdByUserId: financeUser.id,
+      createdAt: overdueDisbursedAt,
+    },
+  });
+  // งวด #1 ครบกำหนดแล้วประมาณ 1 เดือนก่อน แต่ยังไม่ชำระ -> ค้างชำระ (สาธิต aging report)
+
   // คำขอกู้ฉุกเฉินของครูวิชัย: รอพิจารณา (สาธิต flow อนุมัติ/ปฏิเสธ/เบิกจ่าย)
   await prisma.loanContract.create({
     data: {
