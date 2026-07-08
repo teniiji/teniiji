@@ -93,6 +93,18 @@ enum NotificationStatus {
   FAILED
 }
 
+enum ImportBatchType {
+  PAYROLL_RESULT
+  BANK_STATEMENT
+}
+
+enum ReconciliationStatus {
+  MATCHED
+  UNMATCHED
+  RESOLVED
+  IGNORED
+}
+
 model Member {
   id          String       @id @default(cuid())
   memberCode  String       @unique
@@ -103,15 +115,16 @@ model Member {
   affiliation String
   createdAt   DateTime     @default(now())
 
-  user             User?
-  savingsAccounts  SavingsAccount[]
-  shareAccount     ShareAccount?
-  loanContracts    LoanContract[]
-  guarantorFor     LoanGuarantor[]
-  transactions     Transaction[]
-  deductionRecords PayrollDeductionRecord[]
-  welfareClaims    WelfareClaim[]
-  notifications    Notification[]
+  user                User?
+  savingsAccounts     SavingsAccount[]
+  shareAccount        ShareAccount?
+  loanContracts       LoanContract[]
+  guarantorFor        LoanGuarantor[]
+  transactions        Transaction[]
+  deductionRecords    PayrollDeductionRecord[]
+  welfareClaims       WelfareClaim[]
+  notifications       Notification[]
+  reconciliationItems ReconciliationItem[]
 }
 
 model User {
@@ -129,6 +142,7 @@ model User {
   billingRuns          PayrollBillingRun[]
   decidedWelfareClaims WelfareClaim[]
   sentNotifications    Notification[]
+  importBatches        ImportBatch[]
 }
 
 model SavingsAccount {
@@ -237,6 +251,8 @@ model Transaction {
 
   createdByUserId String
   createdByUser   User   @relation(fields: [createdByUserId], references: [id])
+
+  reconciliationItem ReconciliationItem?
 }
 
 model AuditLog {
@@ -335,4 +351,38 @@ model Notification {
 
   createdByUserId String? // null = ระบบสร้างอัตโนมัติจากเหตุการณ์ทางธุรกิจ
   createdByUser   User?   @relation(fields: [createdByUserId], references: [id])
+}
+
+// นำเข้า/กระทบยอด: รูปแบบไฟล์เป็น CSV ทั่วไปที่กำหนดขึ้นเองสำหรับ MVP นี้ (ยังไม่ทราบรูปแบบไฟล์จริง
+// จากต้นสังกัด/ธนาคาร ตามที่ระบุไว้ใน docs/design/07-ข้อสมมติฐานที่ต้องยืนยัน.md) — โครงสร้างออกแบบให้
+// ปรับ parser ในอนาคตได้โดยไม่กระทบ schema ส่วนนี้
+model ImportBatch {
+  id       String          @id @default(cuid())
+  type     ImportBatchType
+  label    String // เช่น งวด "2569-08" (PAYROLL_RESULT) หรือชื่อไฟล์/แหล่งที่มา (BANK_STATEMENT)
+  rowCount Int             @default(0)
+
+  createdAt        DateTime @default(now())
+  importedByUserId String
+  importedByUser   User     @relation(fields: [importedByUserId], references: [id])
+
+  reconciliationItems ReconciliationItem[]
+}
+
+model ReconciliationItem {
+  id            String               @id @default(cuid())
+  rawMemberCode String
+  amountMinor   Int
+  note          String?
+  status        ReconciliationStatus @default(UNMATCHED)
+  createdAt     DateTime             @default(now())
+
+  importBatchId String
+  importBatch   ImportBatch @relation(fields: [importBatchId], references: [id])
+
+  memberId String?
+  member   Member? @relation(fields: [memberId], references: [id])
+
+  matchedTransactionId String?      @unique
+  matchedTransaction   Transaction? @relation(fields: [matchedTransactionId], references: [id])
 }

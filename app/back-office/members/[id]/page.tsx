@@ -146,6 +146,7 @@ export default async function MemberDetailPage({
                 <th className="py-1.5 text-left font-medium">วันที่</th>
                 <th className="py-1.5 text-left font-medium">ประเภท</th>
                 <th className="py-1.5 text-right font-medium">จำนวนเงิน</th>
+                <th className="py-1.5 text-left font-medium">หมายเหตุ</th>
               </tr>
             </thead>
             <tbody>
@@ -158,11 +159,12 @@ export default async function MemberDetailPage({
                   <td className="py-1.5 text-right font-mono">
                     {formatBaht(t.amountMinor)}
                   </td>
+                  <td className="py-1.5 text-xs text-muted">{t.note ?? "-"}</td>
                 </tr>
               ))}
               {member.transactions.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="py-6 text-center text-muted">
+                  <td colSpan={4} className="py-6 text-center text-muted">
                     ยังไม่มีธุรกรรม
                   </td>
                 </tr>

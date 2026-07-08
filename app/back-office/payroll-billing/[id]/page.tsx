@@ -83,6 +83,7 @@ export default async function PayrollBillingDetailPage({
               <th className="px-4 py-2.5 text-right font-medium">เงินฝากภาคบังคับ</th>
               <th className="px-4 py-2.5 text-right font-medium">งวดเงินกู้</th>
               <th className="px-4 py-2.5 text-right font-medium">รวมเรียกเก็บ</th>
+              <th className="px-4 py-2.5 text-right font-medium">หักจริง</th>
             </tr>
           </thead>
           <tbody>
@@ -101,6 +102,15 @@ export default async function PayrollBillingDetailPage({
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono font-semibold">
                   {formatBaht(r.totalDueMinor)}
+                </td>
+                <td className="px-4 py-2.5 text-right font-mono">
+                  {r.actualDeductedMinor === null ? (
+                    <span className="text-muted">ยังไม่มีข้อมูล</span>
+                  ) : r.actualDeductedMinor === r.totalDueMinor ? (
+                    <span className="text-primary-ink">{formatBaht(r.actualDeductedMinor)}</span>
+                  ) : (
+                    <span className="text-flag">{formatBaht(r.actualDeductedMinor)}</span>
+                  )}
                 </td>
               </tr>
             ))}

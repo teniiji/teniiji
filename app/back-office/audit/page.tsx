@@ -15,6 +15,9 @@ const ACTION_LABEL: Record<string, string> = {
   APPROVE_WELFARE_CLAIM: "อนุมัติคำขอสวัสดิการ",
   REJECT_WELFARE_CLAIM: "ปฏิเสธคำขอสวัสดิการ",
   PAY_WELFARE_CLAIM: "จ่ายเงินสวัสดิการ",
+  IMPORT_PAYROLL_RESULT: "นำเข้าผลการหักเงินเดือน",
+  IMPORT_BANK_STATEMENT: "นำเข้า statement/รายการโอน",
+  RESOLVE_RECONCILIATION_ITEM: "ยืนยันกระทบยอดเป็นเงินฝาก",
 };
 
 export default async function AuditLogPage() {

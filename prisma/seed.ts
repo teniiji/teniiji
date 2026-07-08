@@ -9,6 +9,9 @@ async function main() {
 
   // ลบข้อมูลเดิมทั้งหมด (เรียงตามลำดับ dependency) เพื่อให้ seed ซ้ำได้
   await prisma.auditLog.deleteMany();
+  await prisma.reconciliationItem.deleteMany();
+  await prisma.importBatch.deleteMany();
+  await prisma.notification.deleteMany();
   await prisma.transaction.deleteMany();
   await prisma.payrollDeductionRecord.deleteMany();
   await prisma.payrollBillingRun.deleteMany();
