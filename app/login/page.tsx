@@ -19,13 +19,6 @@ export default async function LoginPage() {
           ระบบเงินฝาก-หุ้น-เงินกู้ของสมาชิก
         </p>
         <LoginForm />
-        <div className="mt-6 rounded-md bg-surface-2 px-3 py-2.5 text-xs text-muted">
-          <p className="mb-1 font-semibold text-ink">บัญชีตัวอย่าง (ข้อมูลสาธิต)</p>
-          <p>เจ้าหน้าที่การเงิน: finance01 / password123</p>
-          <p>เจ้าหน้าที่สินเชื่อ: loan01 / password123</p>
-          <p>ผู้จัดการ: manager01 / password123</p>
-          <p>สมาชิก: member01 / password123</p>
-        </div>
       </div>
     </main>
   );

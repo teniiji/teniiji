@@ -9,10 +9,12 @@ function ActionButton({
   label,
   pendingLabel,
   variant = "primary",
+  confirmMessage,
 }: {
   label: string;
   pendingLabel: string;
   variant?: "primary" | "danger";
+  confirmMessage?: string;
 }) {
   const { pending } = useFormStatus();
   const styles =
@@ -23,6 +25,11 @@ function ActionButton({
     <button
       type="submit"
       disabled={pending}
+      onClick={(e) => {
+        if (confirmMessage && !window.confirm(confirmMessage)) {
+          e.preventDefault();
+        }
+      }}
       className={`rounded-md px-4 py-2 text-sm font-semibold disabled:opacity-60 ${styles}`}
     >
       {pending ? pendingLabel : label}
@@ -103,7 +110,11 @@ export function PayClaimAction({ welfareClaimId }: { welfareClaimId: string }) {
     <div>
       <form action={formAction}>
         <input type="hidden" name="welfareClaimId" value={welfareClaimId} />
-        <ActionButton label="จ่ายเงินสวัสดิการ" pendingLabel="กำลังจ่ายเงิน..." />
+        <ActionButton
+          label="จ่ายเงินสวัสดิการ"
+          pendingLabel="กำลังจ่ายเงิน..."
+          confirmMessage="ยืนยันจ่ายเงินสวัสดิการ? เงินจะเข้าบัญชีเงินฝากออมทรัพย์ของสมาชิกทันทีและไม่สามารถย้อนกลับได้"
+        />
       </form>
       <ActionMessage state={state} />
     </div>

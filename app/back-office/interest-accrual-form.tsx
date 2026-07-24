@@ -11,6 +11,15 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
+      onClick={(e) => {
+        if (
+          !window.confirm(
+            "ยืนยันประมวลผลดอกเบี้ยงวดนี้ให้ทุกบัญชี? การกระทำนี้ทำซ้ำในงวดเดียวกันไม่ได้"
+          )
+        ) {
+          e.preventDefault();
+        }
+      }}
       className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
     >
       {pending ? "กำลังประมวลผล..." : "ประมวลผลดอกเบี้ย"}

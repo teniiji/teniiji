@@ -14,10 +14,12 @@ function ActionButton({
   label,
   pendingLabel,
   variant = "primary",
+  confirmMessage,
 }: {
   label: string;
   pendingLabel: string;
   variant?: "primary" | "danger" | "outline";
+  confirmMessage?: string;
 }) {
   const { pending } = useFormStatus();
   const styles = {
@@ -30,6 +32,11 @@ function ActionButton({
     <button
       type="submit"
       disabled={pending}
+      onClick={(e) => {
+        if (confirmMessage && !window.confirm(confirmMessage)) {
+          e.preventDefault();
+        }
+      }}
       className={`rounded-md px-4 py-2 text-sm font-semibold disabled:opacity-60 ${styles}`}
     >
       {pending ? pendingLabel : label}
@@ -105,7 +112,11 @@ export function DisburseAction({ loanContractId }: { loanContractId: string }) {
     <div>
       <form action={formAction}>
         <input type="hidden" name="loanContractId" value={loanContractId} />
-        <ActionButton label="เบิกจ่ายเงินกู้" pendingLabel="กำลังเบิกจ่าย..." />
+        <ActionButton
+          label="เบิกจ่ายเงินกู้"
+          pendingLabel="กำลังเบิกจ่าย..."
+          confirmMessage="ยืนยันเบิกจ่ายเงินกู้ให้สมาชิก? ระบบจะโอนเข้าบัญชีเงินฝากออมทรัพย์ทันทีและไม่สามารถย้อนกลับได้"
+        />
       </form>
       <ActionMessage state={state} />
     </div>
