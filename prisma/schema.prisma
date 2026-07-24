@@ -1,0 +1,388 @@
+// Prisma schema — MVP โมดูล 1: เงินฝาก-หุ้น-เงินกู้ของสมาชิก
+// เงินทุกจำนวนเก็บเป็นจำนวนเต็มหน่วยสตางค์ (Int, minor units) เพื่อเลี่ยงปัญหาปัดเศษของ float
+// dev ใช้ SQLite ผ่าน driver adapter, การย้ายไป PostgreSQL ทำได้โดยเปลี่ยน provider/adapter เท่านั้น
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum MemberStatus {
+  ACTIVE
+  RETIRED
+  RESIGNED
+}
+
+enum MemberType {
+  ORDINARY
+  ASSOCIATE
+}
+
+enum UserRole {
+  STAFF_FINANCE
+  STAFF_LOAN
+  MANAGER
+  ADMIN
+  MEMBER
+}
+
+enum SavingsAccountType {
+  SAVINGS
+  SPECIAL_SAVINGS
+  FIXED_TERM
+}
+
+enum LoanType {
+  EMERGENCY
+  ORDINARY
+  SPECIAL
+}
+
+enum LoanStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  DISBURSED
+  CLOSED
+  REJECTED
+}
+
+enum InstallmentStatus {
+  PENDING
+  PARTIAL
+  PAID
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  SHARE_CONTRIBUTION
+  LOAN_DISBURSEMENT
+  LOAN_PAYMENT
+  INTEREST_ACCRUAL
+  WELFARE_PAYOUT
+}
+
+enum WelfareFundType {
+  FUNERAL
+  EDUCATION
+  MEDICAL
+}
+
+enum WelfareClaimStatus {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  PAID
+}
+
+enum NotificationChannel {
+  IN_APP
+  LINE
+  SMS
+  EMAIL
+}
+
+enum NotificationStatus {
+  SENT
+  PENDING
+  FAILED
+}
+
+enum ImportBatchType {
+  PAYROLL_RESULT
+  BANK_STATEMENT
+}
+
+enum ReconciliationStatus {
+  MATCHED
+  UNMATCHED
+  RESOLVED
+  IGNORED
+}
+
+model Member {
+  id          String       @id @default(cuid())
+  memberCode  String       @unique
+  fullName    String
+  nationalId  String       @unique
+  status      MemberStatus @default(ACTIVE)
+  memberType  MemberType   @default(ORDINARY)
+  affiliation String
+  createdAt   DateTime     @default(now())
+
+  user                User?
+  savingsAccounts     SavingsAccount[]
+  shareAccount        ShareAccount?
+  loanContracts       LoanContract[]
+  guarantorFor        LoanGuarantor[]
+  transactions        Transaction[]
+  deductionRecords    PayrollDeductionRecord[]
+  welfareClaims       WelfareClaim[]
+  notifications       Notification[]
+  reconciliationItems ReconciliationItem[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  role         UserRole
+  createdAt    DateTime @default(now())
+
+  memberId String? @unique
+  member   Member? @relation(fields: [memberId], references: [id])
+
+  createdTransactions  Transaction[]
+  auditLogs            AuditLog[]
+  billingRuns          PayrollBillingRun[]
+  decidedWelfareClaims WelfareClaim[]
+  sentNotifications    Notification[]
+  importBatches        ImportBatch[]
+}
+
+model SavingsAccount {
+  id                    String             @id @default(cuid())
+  accountNumber         String             @unique
+  type                  SavingsAccountType
+  balanceMinor          Int                @default(0)
+  interestRateBps       Int
+  mandatoryMonthlyMinor Int                @default(0) // เงินฝากภาคบังคับที่ต้องเรียกเก็บทุกเดือน (0 = ไม่บังคับ)
+  openedAt              DateTime           @default(now())
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id])
+
+  transactions Transaction[]
+}
+
+model ShareAccount {
+  id                       String   @id @default(cuid())
+  balanceMinor             Int      @default(0)
+  monthlyContributionMinor Int
+  openedAt                 DateTime @default(now())
+
+  memberId String @unique
+  member   Member @relation(fields: [memberId], references: [id])
+
+  transactions Transaction[]
+}
+
+model LoanContract {
+  id              String     @id @default(cuid())
+  type            LoanType
+  principalMinor  Int
+  interestRateBps Int
+  termMonths      Int
+  status          LoanStatus @default(DRAFT)
+  collateralNote  String?
+  createdAt       DateTime   @default(now())
+  approvedAt      DateTime?
+  disbursedAt     DateTime?
+  closedAt        DateTime?
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id])
+
+  guarantors   LoanGuarantor[]
+  installments LoanInstallment[]
+  transactions Transaction[]
+}
+
+model LoanGuarantor {
+  id                    String @id @default(cuid())
+  guaranteedAmountMinor Int
+
+  loanContractId String
+  loanContract   LoanContract @relation(fields: [loanContractId], references: [id])
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id])
+
+  @@unique([loanContractId, memberId])
+}
+
+model LoanInstallment {
+  id                String            @id @default(cuid())
+  installmentNo     Int
+  dueDate           DateTime
+  principalDueMinor Int
+  interestDueMinor  Int
+  paidMinor         Int               @default(0)
+  paidAt            DateTime?
+  status            InstallmentStatus @default(PENDING)
+
+  loanContractId String
+  loanContract   LoanContract @relation(fields: [loanContractId], references: [id])
+
+  transactions Transaction[]
+
+  @@unique([loanContractId, installmentNo])
+}
+
+model Transaction {
+  id          String          @id @default(cuid())
+  type        TransactionType
+  amountMinor Int
+  note        String?
+  createdAt   DateTime        @default(now())
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id])
+
+  savingsAccountId String?
+  savingsAccount   SavingsAccount? @relation(fields: [savingsAccountId], references: [id])
+
+  shareAccountId String?
+  shareAccount   ShareAccount? @relation(fields: [shareAccountId], references: [id])
+
+  loanContractId String?
+  loanContract   LoanContract? @relation(fields: [loanContractId], references: [id])
+
+  loanInstallmentId String?
+  loanInstallment   LoanInstallment? @relation(fields: [loanInstallmentId], references: [id])
+
+  welfareClaimId String?
+  welfareClaim   WelfareClaim? @relation(fields: [welfareClaimId], references: [id])
+
+  createdByUserId String
+  createdByUser   User   @relation(fields: [createdByUserId], references: [id])
+
+  reconciliationItem ReconciliationItem?
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  action     String
+  entityType String
+  entityId   String
+  before     String?
+  after      String?
+  createdAt  DateTime @default(now())
+
+  actorUserId String
+  actorUser   User   @relation(fields: [actorUserId], references: [id])
+}
+
+// เรียกเก็บรายเดือน: รายการยอดที่ขอหักเงินเดือนของสมาชิกแต่ละคน (หุ้น + เงินฝากภาคบังคับ + งวดเงินกู้)
+// ส่งให้ต้นสังกัดหักผ่านเงินเดือนทุกเดือน — actualDeductedMinor จะถูกเติมทีหลังโดยโมดูล
+// นำเข้า/กระทบยอด statement เมื่อทราบผลการหักจริง
+model PayrollBillingRun {
+  id          String   @id @default(cuid())
+  period      String   @unique // รูปแบบ "YYYY-MM"
+  generatedAt DateTime @default(now())
+
+  generatedByUserId String
+  generatedByUser   User   @relation(fields: [generatedByUserId], references: [id])
+
+  records PayrollDeductionRecord[]
+}
+
+model PayrollDeductionRecord {
+  id                  String   @id @default(cuid())
+  shareDueMinor       Int      @default(0)
+  savingsDueMinor     Int      @default(0)
+  loanDueMinor        Int      @default(0)
+  totalDueMinor       Int
+  actualDeductedMinor Int? // ยอดที่หักจริง (เติมทีหลังตอนกระทบยอด statement)
+  createdAt           DateTime @default(now())
+
+  billingRunId String
+  billingRun   PayrollBillingRun @relation(fields: [billingRunId], references: [id])
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id])
+
+  @@unique([billingRunId, memberId])
+}
+
+// สวัสดิการและเงินสงเคราะห์: กองทุน (ฌกส./ทุนการศึกษา/รักษาพยาบาล) และคำขอรับสิทธิ์ของสมาชิก
+model WelfareFund {
+  id                  String          @id @default(cuid())
+  type                WelfareFundType
+  name                String
+  description         String?
+  benefitAmountMinor  Int
+  minMembershipMonths Int             @default(0) // อายุสมาชิกภาพขั้นต่ำ (เดือน) ที่มีสิทธิ์
+  active              Boolean         @default(true)
+  createdAt           DateTime        @default(now())
+
+  claims WelfareClaim[]
+}
+
+model WelfareClaim {
+  id                   String             @id @default(cuid())
+  reason               String
+  requestedAmountMinor Int
+  status               WelfareClaimStatus @default(SUBMITTED)
+  submittedAt          DateTime           @default(now())
+  decidedAt            DateTime?
+  rejectionReason      String?
+  paidAt               DateTime?
+
+  welfareFundId String
+  welfareFund   WelfareFund @relation(fields: [welfareFundId], references: [id])
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id])
+
+  decidedByUserId String?
+  decidedByUser   User?   @relation(fields: [decidedByUserId], references: [id])
+
+  transactions Transaction[]
+}
+
+// แจ้งเตือน/สื่อสารกับสมาชิก: ช่องทางหลักคือ LINE OA/LIFF (ยังไม่ได้เชื่อมต่อ credential จริงใน MVP นี้
+// จึงถือเป็น stub — สร้างระเบียนไว้พร้อมสถานะ PENDING) ส่วน IN_APP (กล่องข้อความในพอร์ทัลสมาชิก) ใช้งานได้จริงทันที
+model Notification {
+  id        String              @id @default(cuid())
+  title     String
+  body      String
+  channel   NotificationChannel @default(IN_APP)
+  status    NotificationStatus  @default(SENT)
+  createdAt DateTime            @default(now())
+
+  memberId String? // null = ประกาศทั่วไปถึงสมาชิกทุกคน
+  member   Member? @relation(fields: [memberId], references: [id])
+
+  createdByUserId String? // null = ระบบสร้างอัตโนมัติจากเหตุการณ์ทางธุรกิจ
+  createdByUser   User?   @relation(fields: [createdByUserId], references: [id])
+}
+
+// นำเข้า/กระทบยอด: รูปแบบไฟล์เป็น CSV ทั่วไปที่กำหนดขึ้นเองสำหรับ MVP นี้ (ยังไม่ทราบรูปแบบไฟล์จริง
+// จากต้นสังกัด/ธนาคาร ตามที่ระบุไว้ใน docs/design/07-ข้อสมมติฐานที่ต้องยืนยัน.md) — โครงสร้างออกแบบให้
+// ปรับ parser ในอนาคตได้โดยไม่กระทบ schema ส่วนนี้
+model ImportBatch {
+  id       String          @id @default(cuid())
+  type     ImportBatchType
+  label    String // เช่น งวด "2569-08" (PAYROLL_RESULT) หรือชื่อไฟล์/แหล่งที่มา (BANK_STATEMENT)
+  rowCount Int             @default(0)
+
+  createdAt        DateTime @default(now())
+  importedByUserId String
+  importedByUser   User     @relation(fields: [importedByUserId], references: [id])
+
+  reconciliationItems ReconciliationItem[]
+}
+
+model ReconciliationItem {
+  id            String               @id @default(cuid())
+  rawMemberCode String
+  amountMinor   Int
+  note          String?
+  status        ReconciliationStatus @default(UNMATCHED)
+  createdAt     DateTime             @default(now())
+
+  importBatchId String
+  importBatch   ImportBatch @relation(fields: [importBatchId], references: [id])
+
+  memberId String?
+  member   Member? @relation(fields: [memberId], references: [id])
+
+  matchedTransactionId String?      @unique
+  matchedTransaction   Transaction? @relation(fields: [matchedTransactionId], references: [id])
+}

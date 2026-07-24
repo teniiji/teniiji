@@ -21,6 +21,10 @@
 ![Teniiji's GitHub stats](https://github-readme-stats.vercel.app/api?username=teniiji&show_icons=true&theme=default)
 ![Top Langs](https://github-readme-stats.vercel.app/api/top-langs/?username=teniiji&layout=compact)
 
+### 📄 เอกสารโครงการ: แอปบริหารสหกรณ์ออมทรัพย์ครู
+- [คู่มือติดตั้งและรันโปรเจกต์](SETUP.md)
+- [เอกสารวิเคราะห์และออกแบบระบบ](docs/design/00-สารบัญ.md)
+
 ### 🔗 Connect with Me
 <!-- ใส่ลิงก์โซเชียล/เว็บไซต์ของคุณ -->
 - LinkedIn: https://www.linkedin.com/in/saksit-khotwandee-35b68a41b
